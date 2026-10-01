@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Save the Cat</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app" data-mode="menu">
+  <div id="play">
+    <svg id="scene" viewBox="0 0 1000 600" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+      <defs>
+        <linearGradient id="skyGrad" gradientUnits="userSpaceOnUse" x1="0" y1="-300" x2="0" y2="480">
+          <stop offset="0" class="st-top"/><stop offset="1" class="st-bottom"/>
+        </linearGradient>
+        <g id="cloud" class="c-cloud">
+          <circle cx="0" cy="0" r="26"/><circle cx="32" cy="-14" r="34"/><circle cx="66" cy="-2" r="26"/>
+          <rect x="0" y="-4" width="66" height="30" rx="15"/>
+        </g>
+        <g id="bgTree">
+          <rect x="-8" y="-72" width="16" height="72" rx="4" fill="#9B6B4A"/>
+          <circle cx="-30" cy="-84" r="30" class="c-bgtree2"/><circle cx="30" cy="-86" r="32" class="c-bgtree2"/>
+          <circle cx="0" cy="-106" r="44" class="c-bgtree"/>
+          <circle cx="-13" cy="-122" r="13" fill="#fff" opacity=".2"/>
+        </g>
+        <g id="pine">
+          <rect x="-6" y="-32" width="12" height="32" fill="#8A5E40"/>
+          <path d="M0 -152 L34 -92 L19 -92 L44 -42 L-44 -42 L-19 -92 L-34 -92 Z" class="c-pine"/>
+        </g>
+        <g id="bush" class="c-bush">
+          <circle cx="-30" cy="-18" r="26"/><circle cx="30" cy="-18" r="26"/><circle cx="0" cy="-30" r="32"/>
+          <rect x="-54" y="-22" width="108" height="22" rx="8"/>
+          <circle cx="-12" cy="-44" r="9" fill="#fff" opacity=".18"/>
+        </g>
+        <g id="flower">
+          <path d="M0 0 V-14" stroke="#3E8E3E" stroke-width="2.5" stroke-linecap="round"/>
+          <g style="fill:var(--petal,#FF6B9A)">
+            <circle cx="0" cy="-21" r="4.3"/><circle cx="4.8" cy="-17.5" r="4.3"/><circle cx="2.9" cy="-12" r="4.3"/>
+            <circle cx="-2.9" cy="-12" r="4.3"/><circle cx="-4.8" cy="-17.5" r="4.3"/>
+          </g>
+          <circle cx="0" cy="-16" r="3" fill="#FFB400"/>
+        </g>
+        <g id="tuft"><path d="M-9 0 L-6 -10 L-3 0 L0 -14 L3 0 L6 -9 L9 0 Z" class="c-tuft"/></g>
+
+        <!-- Worker heads: swap with href="#head-man" / "#head-woman" -->
+        <g id="hardhat">
+          <path d="M-21 -150 C-21 -175 21 -175 21 -150 Z" fill="#FFD23F" stroke="#233049" stroke-width="3" stroke-linejoin="round"/>
+          <rect x="-3" y="-171" width="6" height="19" rx="3" fill="#F2B705"/>
+          <rect x="-23" y="-154" width="52" height="7" rx="3.5" fill="#F2B705" stroke="#233049" stroke-width="2.5"/>
+        </g>
+        <g id="head-man">
+          <rect x="-6" y="-130" width="12" height="11" fill="#E3A983"/>
+          <circle cx="0" cy="-142" r="20" fill="#F2C19B" stroke="#233049" stroke-width="3"/>
+          <path d="M-19.5 -149 C-22 -140 -20 -132 -15 -128 L-11 -148 Z" fill="#4A2F1E"/>
+          <circle cx="-14" cy="-139" r="5" fill="#F2C19B" stroke="#233049" stroke-width="2.5"/>
+          <path d="M4 -151 L10 -150 M12 -150 L18 -151" stroke="#4A2F1E" stroke-width="2.6" stroke-linecap="round"/>
+          <ellipse cx="6" cy="-144" rx="2.6" ry="3.4" fill="#233049"/>
+          <ellipse cx="14" cy="-144" rx="2.6" ry="3.4" fill="#233049"/>
+          <circle cx="16" cy="-133.5" r="3.6" fill="#F59B8B" opacity=".55"/>
+          <path d="M5 -138.5 Q11 -142.5 18 -138.5 Q12 -135.5 5 -138.5 Z" fill="#4A2F1E"/>
+          <path d="M6 -133 Q11 -128.5 16 -133" fill="none" stroke="#233049" stroke-width="2.4" stroke-linecap="round"/>
+          <use href="#hardhat"/>
+        </g>
+        <g id="head-woman">
+          <rect x="-6" y="-130" width="12" height="11" fill="#E3A983"/>
+          <path d="M-13 -151 C-35 -149 -40 -127 -31 -110 C-28 -104 -20 -106 -22 -113 C-27 -126 -23 -138 -11 -143 Z" fill="#7A4128" stroke="#233049" stroke-width="2.5" stroke-linejoin="round"/>
+          <circle cx="-17.5" cy="-145.5" r="4.2" fill="#FF6B9A" stroke="#233049" stroke-width="2"/>
+          <circle cx="0" cy="-142" r="20" fill="#F2C19B" stroke="#233049" stroke-width="3"/>
+          <path d="M-20 -149 C-23 -140 -21 -130 -14.5 -124.5 C-12 -133 -11 -141 -5 -149 Z" fill="#7A4128" stroke="#233049" stroke-width="2.5" stroke-linejoin="round"/>
+          <path d="M-7 -150 Q2 -140 9 -148.5 Q14 -142 20.5 -147.5 L20.5 -151 L-7 -151 Z" fill="#7A4128"/>
+          <ellipse cx="6" cy="-142.5" rx="2.6" ry="3.4" fill="#233049"/>
+          <ellipse cx="14" cy="-142.5" rx="2.6" ry="3.4" fill="#233049"/>
+          <path d="M8.2 -145.5 L10.2 -148 M16.2 -145.5 L18.2 -148" stroke="#233049" stroke-width="1.7" stroke-linecap="round"/>
+          <circle cx="15.5" cy="-135" r="4.3" fill="#F58BA0" opacity=".7"/>
+          <path d="M5.5 -133.5 Q11 -128.5 16 -133.5" fill="none" stroke="#C2415B" stroke-width="2.6" stroke-linecap="round"/>
+          <use href="#hardhat"/>
+        </g>
+      </defs>
+
+      <!-- Sky -->
+      <rect x="-2000" y="-3000" width="5000" height="3500" fill="url(#skyGrad)"/>
+      <g transform="translate(790 88)">
+        <g class="sun-rays">
+          <g stroke="var(--sun)" stroke-width="7" stroke-linecap="round" opacity=".55" style="stroke:var(--sun)">
+            <path d="M0 -62 V-78 M0 62 V78 M-62 0 H-78 M62 0 H78 M44 44 L55 55 M-44 -44 L-55 -55 M44 -44 L55 -55 M-44 44 L-55 55"/>
+          </g>
+        </g>
+        <circle r="46" class="c-sun"/>
+        <circle cx="-14" cy="-14" r="14" fill="#fff" opacity=".35"/>
+      </g>
+      <g id="clouds"></g>
+
+      <!-- Far landscape -->
+      <ellipse cx="-260" cy="505" rx="520" ry="120" class="c-hill"/>
+      <ellipse cx="1520" cy="505" rx="540" ry="135" class="c-hill"/>
+      <ellipse cx="700" cy="515" rx="620" ry="105" class="c-hill2"/>
+      <g id="bgTrees">
+        <use href="#bgTree" transform="translate(-540 492) scale(1.1)"/>
+        <use href="#pine" transform="translate(-380 494) scale(.9)"/>
+        <use href="#bgTree" transform="translate(-200 492) scale(.85)"/>
+        <use href="#pine" transform="translate(-60 494) scale(1.1)"/>
+        <use href="#bgTree" transform="translate(70 492) scale(1)"/>
+        <use href="#pine" transform="translate(200 494) scale(.75)"/>
+        <use href="#bgTree" transform="translate(720 492) scale(.9)"/>
+        <use href="#pine" transform="translate(850 494) scale(1.15)"/>
+        <use href="#bgTree" transform="translate(1000 492) scale(1.05)"/>
+        <use href="#pine" transform="translate(1150 494) scale(.85)"/>
+        <use href="#bgTree" transform="translate(1300 492) scale(.95)"/>
+        <use href="#pine" transform="translate(1460 494) scale(1)"/>
+      </g>
+
+      <!-- Ground -->
+      <rect x="-2000" y="488" width="5000" height="2000" class="c-grass"/>
+      <rect x="-2000" y="562" width="5000" height="2000" class="c-grass2"/>
+      <path d="M 560 620 C 620 570, 760 526, 980 494 L 1070 494 C 870 530, 740 572, 720 620 Z" class="c-path"/>
+      <g id="tufts"></g>
+      <use href="#bush" transform="translate(-300 502) scale(1.1)"/>
+      <use href="#bush" transform="translate(10 502) scale(.9)"/>
+      <use href="#bush" transform="translate(655 500) scale(.8)"/>
+      <use href="#bush" transform="translate(1120 504) scale(1.15)"/>
+      <!-- bench -->
+      <g transform="translate(800 504)">
+        <rect x="-52" y="-30" width="7" height="30" fill="#5B4636"/><rect x="45" y="-30" width="7" height="30" fill="#5B4636"/>
+        <rect x="-50" y="-66" width="6" height="36" fill="#5B4636"/><rect x="44" y="-66" width="6" height="36" fill="#5B4636"/>
+        <rect x="-62" y="-66" width="124" height="9" rx="4" fill="#C9864A" stroke="#233049" stroke-width="2.5"/>
+        <rect x="-62" y="-52" width="124" height="9" rx="4" fill="#C9864A" stroke="#233049" stroke-width="2.5"/>
+        <rect x="-64" y="-36" width="128" height="10" rx="4" fill="#D8955A" stroke="#233049" stroke-width="2.5"/>
+      </g>
+      <!-- lamp -->
+      <g transform="translate(960 506)">
+        <rect x="-4" y="-176" width="8" height="176" rx="3" fill="#2E4A3F"/>
+        <rect x="-11" y="-8" width="22" height="8" rx="3" fill="#2E4A3F"/>
+        <path d="M-16 -176 L16 -176 L10 -198 L-10 -198 Z" fill="#FFE58A" stroke="#233049" stroke-width="2.5" stroke-linejoin="round"/>
+        <path d="M-18 -176 H18" stroke="#2E4A3F" stroke-width="5" stroke-linecap="round"/>
+        <path d="M-12 -198 H12 L0 -208 Z" fill="#2E4A3F"/>
+      </g>
+      <g id="flowersBack"></g>
+
+      <!-- Main tree -->
+      <ellipse cx="505" cy="501" rx="150" ry="14" fill="#000" opacity=".12"/>
+      <g id="tree">
+        <path d="M 438 503 C 462 492, 470 452, 472 382 L 470 196 L 540 196 L 538 382 C 540 452, 548 492, 574 503 Z" fill="#8B5A3C" stroke="#233049" stroke-width="3" stroke-linejoin="round"/>
+        <path d="M 490 470 C 488 440, 492 420, 488 392 M 520 444 C 522 414, 518 384, 522 354 M 500 332 C 498 302, 502 272, 498 242" stroke="#6E4329" stroke-width="4" fill="none" stroke-linecap="round"/>
+        <ellipse cx="516" cy="282" rx="8" ry="12" fill="#5A3620"/>
+        <g class="crown">
+          <ellipse cx="505" cy="236" rx="150" ry="34" fill="#2E8540"/>
+          <circle cx="400" cy="190" r="80" fill="#3A9A47" stroke="#233049" stroke-width="3"/>
+          <circle cx="612" cy="190" r="84" fill="#3A9A47" stroke="#233049" stroke-width="3"/>
+          <circle cx="505" cy="150" r="120" fill="#3FA34D" stroke="#233049" stroke-width="3"/>
+          <circle cx="440" cy="92" r="74" fill="#4DB356"/>
+          <circle cx="580" cy="86" r="80" fill="#4DB356"/>
+          <circle cx="505" cy="52" r="68" fill="#56BD5E"/>
+          <circle cx="400" cy="190" r="72" fill="#3A9A47"/>
+          <circle cx="612" cy="190" r="76" fill="#3A9A47"/>
+          <circle cx="505" cy="190" r="80" fill="#3FA34D"/>
+          <circle cx="458" cy="68" r="28" fill="#74CF74" opacity=".75"/>
+          <circle cx="572" cy="118" r="20" fill="#74CF74" opacity=".55"/>
+          <circle cx="410" cy="164" r="16" fill="#74CF74" opacity=".5"/>
+          <circle cx="640" cy="170" r="14" fill="#74CF74" opacity=".45"/>
+        </g>
+      </g>
+
+      <!-- Dangerous branch (pivot 472,300) -->
+      <g id="branch">
+        <path d="M 360 284 C 350 266, 346 256, 338 246 M 300 282 C 296 298, 290 306, 282 314" stroke="#7A4B30" stroke-width="6" fill="none" stroke-linecap="round"/>
+        <path d="M 476 286 C 420 283, 330 277, 250 274 C 243 278, 243 285, 250 289 C 330 292, 420 300, 476 316 Z" fill="#8B5A3C" stroke="#233049" stroke-width="3" stroke-linejoin="round"/>
+        <path d="M 450 299 C 400 293, 340 288, 292 284" stroke="#6E4329" stroke-width="3" fill="none" stroke-linecap="round"/>
+        <g stroke="#233049" stroke-width="2.5">
+          <circle cx="262" cy="268" r="26" fill="#4DB356"/>
+          <circle cx="236" cy="286" r="21" fill="#46AA50"/>
+          <circle cx="288" cy="252" r="19" fill="#56BD5E"/>
+          <circle cx="258" cy="302" r="17" fill="#46AA50"/>
+          <circle cx="338" cy="242" r="17" fill="#56BD5E"/>
+          <circle cx="282" cy="316" r="13" fill="#4DB356"/>
+        </g>
+        <circle cx="254" cy="260" r="8" fill="#74CF74" opacity=".7"/>
+        <circle cx="334" cy="237" r="6" fill="#74CF74" opacity=".7"/>
+        <g id="crack" opacity=".25">
+          <path d="M 480 288 L 470 295 L 479 302 L 468 309 L 476 315" stroke="#2A170C" stroke-width="3" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
+          <path d="M 462 292 L 456 286 M 460 312 L 454 318" stroke="#2A170C" stroke-width="2.5" stroke-linecap="round"/>
+        </g>
+      </g>
+
+      <!-- Park worker (feet at 0,0, facing right) -->
+      <g id="worker" transform="translate(130 500)">
+        <ellipse cx="0" cy="0" rx="30" ry="6" fill="#000" opacity=".15"/>
+        <g id="workerBob">
+          <g stroke="#233049" stroke-width="2.5">
+            <rect x="-22" y="-114" width="12" height="46" rx="6" fill="#357A52"/>
+            <circle cx="-16" cy="-66" r="6.5" fill="#F2C19B"/>
+          </g>
+          <g class="leg leg-a" stroke="#233049" stroke-width="2.5">
+            <rect x="-14" y="-62" width="13" height="54" rx="6" fill="#2A5448"/>
+            <rect x="-16" y="-12" width="20" height="12" rx="5" fill="#5A3B28"/>
+          </g>
+          <g class="leg leg-b" stroke="#233049" stroke-width="2.5">
+            <rect x="0" y="-62" width="13" height="54" rx="6" fill="#2F5D50"/>
+            <rect x="-1" y="-12" width="22" height="12" rx="5" fill="#5A3B28"/>
+          </g>
+          <rect x="-25" y="-122" width="48" height="66" rx="15" fill="#3E8E5E" stroke="#233049" stroke-width="3"/>
+          <path d="M-25 -104 Q-25 -120 -12 -121 L-5 -121 L-1 -101 L3 -121 L10 -121 Q23 -120 23 -104 L23 -64 Q23 -58 17 -58 L-19 -58 Q-25 -58 -25 -64 Z" fill="#FF8A2B" stroke="#233049" stroke-width="3" stroke-linejoin="round"/>
+          <rect x="-23" y="-94" width="44" height="6" fill="#FFF15C"/>
+          <rect x="-23" y="-80" width="44" height="6" fill="#FFF15C"/>
+          <rect x="-25" y="-63" width="48" height="7" rx="3" fill="#3B2F2A"/>
+          <use id="workerHead" href="#head-man"/>
+          <!-- axe arm (shoulder pivot 4,-110) -->
+          <g id="axeArm" transform="rotate(-25 4 -110)">
+            <rect x="1" y="-72" width="6" height="62" rx="3" fill="#A0643C" stroke="#233049" stroke-width="2"/>
+            <path d="M2 -35 L-16 -42 C-23 -32 -23 -18 -16 -8 L2 -15 Z" fill="#C3CED6" stroke="#233049" stroke-width="2.5" stroke-linejoin="round"/>
+            <path d="M-16 -39 C-20 -30 -20 -19 -16 -11" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+            <rect x="-2" y="-115" width="12" height="52" rx="6" fill="#3E8E5E" stroke="#233049" stroke-width="2.5"/>
+            <circle cx="4" cy="-64" r="7" fill="#F2C19B" stroke="#233049" stroke-width="2.5"/>
+          </g>
+          <g transform="translate(26 -192)">
+            <g id="bubble"><g id="bubbleInner">
+              <circle r="15" fill="#fff" stroke="#233049" stroke-width="3"/>
+              <path d="M-5 13 L0 22 L4 13 Z" fill="#fff" stroke="#233049" stroke-width="2.5" stroke-linejoin="round"/>
+              <rect x="-4" y="9" width="8" height="6" fill="#fff"/>
+              <text y="8" text-anchor="middle" font-size="24" class="fx-text" fill="#F2545B">!</text>
+            </g></g>
+          </g>
+        </g>
+      </g>
+
+      <!-- Cat (feet at 0,0) -->
+      <g id="cat" data-mood="normal" transform="translate(330 500)">
+        <ellipse cx="0" cy="0" rx="38" ry="6" fill="#000" opacity=".15"/>
+        <g id="catBody">
+          <path id="catTail" d="M22 -12 C52 -12 60 -38 50 -60 C46 -68 37 -66 39 -58 C46 -42 42 -26 20 -24 Z" fill="#F7A04B" stroke="#233049" stroke-width="3" stroke-linejoin="round"/>
+          <ellipse cx="0" cy="-30" rx="30" ry="30" fill="#F7A04B" stroke="#233049" stroke-width="3"/>
+          <ellipse cx="0" cy="-24" rx="16" ry="19" fill="#FFE3BF"/>
+          <path d="M-29 -37 L-19 -35 M-30 -27 L-21 -26 M29 -37 L19 -35 M30 -27 L21 -26" stroke="#E07B28" stroke-width="3.5" stroke-linecap="round"/>
+          <ellipse cx="-12" cy="-3" rx="10" ry="6.5" fill="#FFE3BF" stroke="#233049" stroke-width="2.5"/>
+          <ellipse cx="12" cy="-3" rx="10" ry="6.5" fill="#FFE3BF" stroke="#233049" stroke-width="2.5"/>
+          <g id="catHead">
+            <path d="M-27 -80 L-25 -113 L-4 -97 Z" fill="#F7A04B" stroke="#233049" stroke-width="3" stroke-linejoin="round"/>
+            <path d="M-22 -86 L-21 -104 L-9 -95 Z" fill="#FFB3C1"/>
+            <path d="M27 -80 L25 -113 L4 -97 Z" fill="#F7A04B" stroke="#233049" stroke-width="3" stroke-linejoin="round"/>
+            <path d="M22 -86 L21 -104 L9 -95 Z" fill="#FFB3C1"/>
+            <circle cx="0" cy="-70" r="31" fill="#F7A04B" stroke="#233049" stroke-width="3"/>
+            <path d="M-7 -99 L-5 -90 M0 -101 L0 -91 M7 -99 L5 -90" stroke="#E07B28" stroke-width="3" stroke-linecap="round"/>
+            <ellipse cx="0" cy="-57" rx="14" ry="10" fill="#FFE3BF"/>
+            <circle cx="-20" cy="-60" r="5" fill="#FF8FA3" opacity=".55"/>
+            <circle cx="20" cy="-60" r="5" fill="#FF8FA3" opacity=".55"/>
+            <path d="M-13 -60 L-34 -64 M-13 -56 L-34 -54 M13 -60 L34 -64 M13 -56 L34 -54" stroke="#7A4B2A" stroke-width="1.6" stroke-linecap="round"/>
+            <g class="e-look"><g class="e-open">
+              <ellipse cx="-11" cy="-73" rx="5.2" ry="7" fill="#233049"/>
+              <ellipse cx="11" cy="-73" rx="5.2" ry="7" fill="#233049"/>
+              <circle cx="-9.3" cy="-75.5" r="1.9" fill="#fff"/><circle cx="12.7" cy="-75.5" r="1.9" fill="#fff"/>
+            </g></g>
+            <g class="e-happy" stroke="#233049" stroke-width="3" fill="none" stroke-linecap="round">
+              <path d="M-17 -71 Q-11 -79 -5 -71"/><path d="M5 -71 Q11 -79 17 -71"/>
+            </g>
+            <g class="e-surp">
+              <circle cx="-11" cy="-74" r="8" fill="#fff" stroke="#233049" stroke-width="2.5"/>
+              <circle cx="11" cy="-74" r="8" fill="#fff" stroke="#233049" stroke-width="2.5"/>
+              <circle cx="-11" cy="-74" r="2.8" fill="#233049"/><circle cx="11" cy="-74" r="2.8" fill="#233049"/>
+            </g>
+            <g class="brows" stroke="#7A4B2A" stroke-width="2.6" stroke-linecap="round">
+              <path d="M-18 -83 L-6 -88"/><path d="M18 -83 L6 -88"/>
+            </g>
+            <path class="sweat" d="M27 -92 C24 -86 23 -82 27 -80 C31 -82 30 -86 27 -92 Z" fill="#8ED3FF" stroke="#233049" stroke-width="1.8"/>
+            <path d="M-4.5 -63.5 L4.5 -63.5 L0 -58.5 Z" fill="#FF7A93" stroke="#233049" stroke-width="1.6" stroke-linejoin="round"/>
+            <path class="mo-cat" d="M-6 -55 Q-3 -51.5 0 -55 Q3 -51.5 6 -55" fill="none" stroke="#233049" stroke-width="2" stroke-linecap="round"/>
+            <path class="mo-worry" d="M-6 -52 Q-3 -55.5 0 -52 Q3 -48.5 6 -52" fill="none" stroke="#233049" stroke-width="2" stroke-linecap="round"/>
+            <path class="mo-happy" d="M-7 -55 Q0 -44 7 -55 Z" fill="#D9536F" stroke="#233049" stroke-width="2" stroke-linejoin="round"/>
+            <ellipse class="mo-o" cx="0" cy="-51" rx="3.8" ry="4.8" fill="#D9536F" stroke="#233049" stroke-width="2"/>
+          </g>
+        </g>
+      </g>
+
+      <g id="flowersFront"></g>
+      <g id="fx"></g>
+    </svg>
+
+    <!-- HUD -->
+    <div id="hud">
+      <div class="pill hud-left" id="scoreEl">Score: 0</div>
+      <div class="pill hud-center" id="levelEl">Level: 1</div>
+      <div class="hud-right" id="timeWrap">
+        <div class="pill" id="timeEl">Time: 8.0</div>
+        <button class="icon-btn" id="muteBtn" type="button" aria-label="Toggle sound" data-action="sound">
+          <svg class="ic-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9z" fill="currentColor"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19.5 5.5a9 9 0 0 1 0 13"/></svg>
+          <svg class="ic-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9z" fill="currentColor"/><path d="M17 9l5 6M22 9l-5 6"/></svg>
+        </button>
+      </div>
+      <div class="timebar" id="timebar"><div class="timefill" id="timefill"></div></div>
+    </div>
+
+    <div id="challenge" class="idle">
+      <div class="word" id="word" aria-live="polite"></div>
+      <div class="hint">Type quickly to save the cat!</div>
+    </div>
+
+    <div id="shout" role="status"></div>
+    <div id="banner"><div class="lv" id="bannerLv">Level 1</div><div class="note" id="bannerNote"></div></div>
+  </div>
+
+  <div id="vk" aria-label="On-screen keyboard"></div>
+
+  <!-- Screens -->
+  <section class="screen" id="menu">
+    <div class="panel">
+      <div class="title" aria-label="Save the Cat">
+        <div class="row"><span class="t" style="--i:0">S</span><span class="t" style="--i:1">A</span><span class="t" style="--i:2">V</span><span class="t" style="--i:3">E</span></div>
+        <div class="row"><span class="t" style="--i:4">T</span><span class="t" style="--i:5">H</span><span class="t" style="--i:6">E</span></div>
+        <div class="row"><span class="t" style="--i:7">C</span><span class="t" style="--i:8">A</span><span class="t" style="--i:9">T</span></div>
+      </div>
+      <p class="tagline">Type fast. Save the cat!</p>
+      <p class="pick-label" id="pickLabel">Choose your park worker</p>
+      <div class="picker" role="group" aria-labelledby="pickLabel">
+        <button class="pick" type="button" data-action="gender" data-gender="man" aria-pressed="true">
+          <svg viewBox="-40 -178 72 60" aria-hidden="true">
+            <rect x="-25" y="-122" width="48" height="66" rx="15" fill="#3E8E5E" stroke="#233049" stroke-width="3"/>
+            <path d="M-25 -104 Q-25 -120 -12 -121 L-5 -121 L-1 -101 L3 -121 L10 -121 Q23 -120 23 -104 L23 -60 L-25 -60 Z" fill="#FF8A2B" stroke="#233049" stroke-width="3" stroke-linejoin="round"/>
+            <use href="#head-man"/>
+          </svg>
+          <span>MAN</span>
+        </button>
+        <button class="pick" type="button" data-action="gender" data-gender="woman" aria-pressed="false">
+          <svg viewBox="-40 -178 72 60" aria-hidden="true">
+            <rect x="-25" y="-122" width="48" height="66" rx="15" fill="#3E8E5E" stroke="#233049" stroke-width="3"/>
+            <path d="M-25 -104 Q-25 -120 -12 -121 L-5 -121 L-1 -101 L3 -121 L10 -121 Q23 -120 23 -104 L23 -60 L-25 -60 Z" fill="#FF8A2B" stroke="#233049" stroke-width="3" stroke-linejoin="round"/>
+            <use href="#head-woman"/>
+          </svg>
+          <span>WOMAN</span>
+        </button>
+      </div>
+      <div class="btns">
+        <button class="btn" type="button" data-action="start">START GAME</button>
+        <button class="btn alt" type="button" data-action="howto">HOW TO PLAY</button>
+        <button class="btn plain" type="button" data-action="sound" id="soundBtn">SOUND ON</button>
+        <a class="btn plain duel-link" href="../index.html">TWO-PLAYER DUEL</a>
+        <a class="btn plain duel-link" href="../index.html#leaderboard" id="soloBoardLink" hidden>LEADERBOARD</a>
+      </div>
+      <p class="best-line" id="menuBest"></p>
+    </div>
+  </section>
+
+  <section class="screen" id="howto" hidden>
+    <div class="panel">
+      <h2>How to play</h2>
+      <ol class="steps">
+        <li>Words will appear on the screen.</li>
+        <li>Type the word as quickly and accurately as possible.</li>
+        <li>Every successful answer helps the worker cut the dangerous branch.</li>
+        <li class="final">Save the cat!</li>
+      </ol>
+      <p class="sub" style="margin-top:16px">No clicking needed. Just start typing. Backspace fixes a wrong letter, but each mistake costs time.</p>
+      <div class="btns">
+        <button class="btn" type="button" data-action="start">START</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" id="gameover" hidden>
+    <div class="panel">
+      <h2>GAME OVER</h2>
+      <p class="sub">The branch fell before the word was finished. The cat is fine, just a little startled.</p>
+      <div class="stats">
+        <div><span>Final Score:</span><b id="goScore">0</b></div>
+        <div><span>Level Reached:</span><b id="goLevel">1</b></div>
+        <div><span>Best Score:</span><b id="goBest">0</b></div>
+      </div>
+      <p class="online-line" id="goOnline" aria-live="polite"></p>
+      <div class="btns">
+        <button class="btn" type="button" data-action="start">PLAY AGAIN</button>
+        <button class="btn plain" type="button" data-action="menu">MAIN MENU</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" id="win" hidden>
+    <div class="panel">
+      <h2>The cat is safe!</h2>
+      <p class="sub">You cleared all 10 levels and the branch never landed.</p>
+      <div class="stats">
+        <div><span>Final Score:</span><b id="winScore">0</b></div>
+        <div><span>Best Score:</span><b id="winBest">0</b></div>
+      </div>
+      <p class="online-line" id="winOnline" aria-live="polite"></p>
+      <div class="btns">
+        <button class="btn" type="button" data-action="start">PLAY AGAIN</button>
+        <button class="btn plain" type="button" data-action="menu">MAIN MENU</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script src="../words.js"></script>
+<script src="../wordbank.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

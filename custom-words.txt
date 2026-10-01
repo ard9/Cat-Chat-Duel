@@ -1,0 +1,20 @@
+# Your own words for Save the Cat
+# ------------------------------------------------------------
+# One word or phrase per line. English letters and spaces only, 2 to 24 characters.
+# Lines starting with # are ignored. Upper or lower case both work.
+#
+# By default these are MIXED into the built-in list of about 3000 words.
+# Each word is placed at a level automatically (longer and trickier = later levels).
+# Phrases with spaces appear from level 7 on.
+#
+# To play with ONLY your words (for example this week's vocabulary lesson), start the server with:
+#   WORDS_MODE=only node server.js
+#
+# You can edit this file while the server is running: new matches use the new words.
+# ------------------------------------------------------------
+# Examples (remove the # to use them):
+# kitten
+# butterfly
+# playground
+# watering can
+# the squirrel is climbing

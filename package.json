@@ -1,0 +1,13 @@
+{
+  "name": "save-the-cat-duel",
+  "version": "1.0.0",
+  "description": "Two-player typing race with accounts, Elo ratings and leaderboards. Zero dependencies (uses built-in node:sqlite).",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "license": "MIT"
+}
