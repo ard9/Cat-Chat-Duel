@@ -438,7 +438,24 @@ function showScreen(id){
   const sc = screens.find(s => s.id === id);
   if (sc){ const b = sc.querySelector('.btn'); setTimeout(() => { if (!sc.hidden) b.focus({ preventScroll:true }); }, 450); }
 }
+let holdGame = false;
+function pauseGame(){
+  if (app.dataset.mode !== 'game' || state === 'over' || state === 'win') return false;
+  holdGame = true;
+  if (state === 'playing'){ state = 'paused'; cancelAnimationFrame(rafId); }
+  $('#confirm').hidden = false;
+  setTimeout(() => $('#confirm .btn').focus({ preventScroll: true }), 50);
+  return true;
+}
+function resumeGame(){
+  holdGame = false;
+  $('#confirm').hidden = true;
+  if (state === 'paused'){ state = 'playing'; lastT = performance.now(); rafId = requestAnimationFrame(loop); }
+}
 function toMenu(){
+  holdGame = false;
+  const c = $('#confirm'); if (c) c.hidden = true;
+  if (!ACCOUNT){ showScreen('gate'); return; }
   resetScene();
   state = 'menu';
   app.dataset.mode = 'menu';
@@ -490,6 +507,7 @@ function startRound(){
   workerReact();
   state = 'playing';
   lastT = performance.now();
+  if (holdGame){ state = 'paused'; return; }     // the quit dialog is open: wait until the player decides
   rafId = requestAnimationFrame(loop);
 }
 
@@ -686,6 +704,13 @@ async function saveOnline(score, lvl, sel){
    ========================================================= */
 document.addEventListener('keydown', e => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key === 'Escape'){
+    const sc = screens.find(x => !x.hidden);
+    const back = sc && sc.querySelector('[data-back]');
+    if (back){ e.preventDefault(); back.click(); return; }
+    if (!sc && pauseGame()) e.preventDefault();
+    return;
+  }
   if (state === 'playing' || state === 'resolving' || state === 'transition'){
     if (e.key === 'Backspace'){ e.preventDefault(); backspace(); return; }
     if (e.key === ' ' || e.key === 'Spacebar'){ e.preventDefault(); handleChar(' '); return; }
@@ -710,8 +735,10 @@ app.addEventListener('click', e => {
     return;
   }
   Sfx.click();
-  if (act === 'gender'){ setGender(b.dataset.gender); return; }
-  if (act === 'start') startGame();
+  if (act === 'quitAsk'){ b.blur(); pauseGame(); return; }
+  if (act === 'resumeGame'){ resumeGame(); return; }
+  if (act === 'quitGame'){ toMenu(); return; }
+  if (act === 'start'){ if (!ACCOUNT){ showScreen('gate'); return; } startGame(); }
   else if (act === 'howto') showScreen('howto');
   else if (act === 'menu') toMenu();
 });
@@ -754,17 +781,37 @@ addEventListener('touchstart', setTouch, { passive:true, once:true });
 /* =========================================================
    Boot
    ========================================================= */
-function setGender(g){
-  const gender = g === 'woman' ? 'woman' : 'man';
-  store.set('stc.worker', gender);
-  $('#workerHead').setAttribute('href', '#head-' + gender);
-  workerEl.dataset.gender = gender;
-  document.querySelectorAll('.pick').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.gender === gender)));
+/* Everyone plays with an account: check the sign-in saved by the main page */
+let ACCOUNT = null;
+function applyAccount(u){
+  ACCOUNT = u;
+  const av = window.STCAvatar ? window.STCAvatar.normalize(u.avatar, u.gender) : { g: u.gender === 'woman' ? 'woman' : 'man' };
+  $('#workerHead').setAttribute('href', '#head-' + av.g);
+  if (window.STCAvatar) window.STCAvatar.apply(workerEl, av);
+  $('#soloName').textContent = u.username;
+  $('#soloFace').innerHTML = window.STCAvatar ? window.STCAvatar.portrait(av, 'acct-face') : '';
+  $('#soloStats').textContent = u.soloBest ? `Solo best ${u.soloBest} (level ${u.soloLevel})` : 'No solo score yet. Set your first!';
+}
+async function checkAccount(){
+  if (location.protocol === 'file:'){
+    $('#gateText').textContent = 'You opened the file directly. Start the server with "node server.js", open the address it prints and sign in. Everyone needs an account to play.';
+    return null;
+  }
+  const token = authToken();
+  if (!token) return null;
+  try {
+    const r = await fetch('/api/me', { headers: { Authorization: 'Bearer ' + token } });
+    if (!r.ok) return null;
+    return (await r.json()).user;
+  } catch (e){ $('#gateText').textContent = 'Could not reach the server. Check your connection and reload the page.'; return null; }
 }
 
-setGender(store.get('stc.worker', 'man'));
 updateSoundUI();
 fitScene();
 applyBranch(); applyWorker(); applyAxe(); applyCat();
-toMenu();
+showScreen(null);
+checkAccount().then(u => {
+  if (u){ applyAccount(u); accountsOn = true; toMenu(); }
+  else showScreen('gate');
+});
 })();

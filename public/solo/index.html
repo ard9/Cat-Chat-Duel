@@ -48,30 +48,30 @@
 
         <!-- Worker heads: swap with href="#head-man" / "#head-woman" -->
         <g id="hardhat">
-          <path d="M-21 -150 C-21 -175 21 -175 21 -150 Z" fill="#FFD23F" stroke="#233049" stroke-width="3" stroke-linejoin="round"/>
-          <rect x="-3" y="-171" width="6" height="19" rx="3" fill="#F2B705"/>
-          <rect x="-23" y="-154" width="52" height="7" rx="3.5" fill="#F2B705" stroke="#233049" stroke-width="2.5"/>
+          <path d="M-21 -150 C-21 -175 21 -175 21 -150 Z" style="fill:var(--hat,#FFD23F)" stroke="#233049" stroke-width="3" stroke-linejoin="round"/>
+          <rect x="-3" y="-171" width="6" height="19" rx="3" style="fill:var(--hat-dark,#F2B705)"/>
+          <rect x="-23" y="-154" width="52" height="7" rx="3.5" style="fill:var(--hat-dark,#F2B705)" stroke="#233049" stroke-width="2.5"/>
         </g>
         <g id="head-man">
-          <rect x="-6" y="-130" width="12" height="11" fill="#E3A983"/>
-          <circle cx="0" cy="-142" r="20" fill="#F2C19B" stroke="#233049" stroke-width="3"/>
-          <path d="M-19.5 -149 C-22 -140 -20 -132 -15 -128 L-11 -148 Z" fill="#4A2F1E"/>
-          <circle cx="-14" cy="-139" r="5" fill="#F2C19B" stroke="#233049" stroke-width="2.5"/>
-          <path d="M4 -151 L10 -150 M12 -150 L18 -151" stroke="#4A2F1E" stroke-width="2.6" stroke-linecap="round"/>
+          <rect x="-6" y="-130" width="12" height="11" style="fill:var(--skin-shade,#E3A983)"/>
+          <circle cx="0" cy="-142" r="20" style="fill:var(--skin,#F2C19B)" stroke="#233049" stroke-width="3"/>
+          <path d="M-19.5 -149 C-22 -140 -20 -132 -15 -128 L-11 -148 Z" style="fill:var(--hair,#4A2F1E)"/>
+          <circle cx="-14" cy="-139" r="5" style="fill:var(--skin,#F2C19B)" stroke="#233049" stroke-width="2.5"/>
+          <path d="M4 -151 L10 -150 M12 -150 L18 -151" style="stroke:var(--hair,#4A2F1E)" stroke-width="2.6" stroke-linecap="round"/>
           <ellipse cx="6" cy="-144" rx="2.6" ry="3.4" fill="#233049"/>
           <ellipse cx="14" cy="-144" rx="2.6" ry="3.4" fill="#233049"/>
           <circle cx="16" cy="-133.5" r="3.6" fill="#F59B8B" opacity=".55"/>
-          <path d="M5 -138.5 Q11 -142.5 18 -138.5 Q12 -135.5 5 -138.5 Z" fill="#4A2F1E"/>
+          <path d="M5 -138.5 Q11 -142.5 18 -138.5 Q12 -135.5 5 -138.5 Z" style="fill:var(--hair,#4A2F1E)"/>
           <path d="M6 -133 Q11 -128.5 16 -133" fill="none" stroke="#233049" stroke-width="2.4" stroke-linecap="round"/>
           <use href="#hardhat"/>
         </g>
         <g id="head-woman">
-          <rect x="-6" y="-130" width="12" height="11" fill="#E3A983"/>
-          <path d="M-13 -151 C-35 -149 -40 -127 -31 -110 C-28 -104 -20 -106 -22 -113 C-27 -126 -23 -138 -11 -143 Z" fill="#7A4128" stroke="#233049" stroke-width="2.5" stroke-linejoin="round"/>
+          <rect x="-6" y="-130" width="12" height="11" style="fill:var(--skin-shade,#E3A983)"/>
+          <path d="M-13 -151 C-35 -149 -40 -127 -31 -110 C-28 -104 -20 -106 -22 -113 C-27 -126 -23 -138 -11 -143 Z" style="fill:var(--hair,#7A4128)" stroke="#233049" stroke-width="2.5" stroke-linejoin="round"/>
           <circle cx="-17.5" cy="-145.5" r="4.2" fill="#FF6B9A" stroke="#233049" stroke-width="2"/>
-          <circle cx="0" cy="-142" r="20" fill="#F2C19B" stroke="#233049" stroke-width="3"/>
-          <path d="M-20 -149 C-23 -140 -21 -130 -14.5 -124.5 C-12 -133 -11 -141 -5 -149 Z" fill="#7A4128" stroke="#233049" stroke-width="2.5" stroke-linejoin="round"/>
-          <path d="M-7 -150 Q2 -140 9 -148.5 Q14 -142 20.5 -147.5 L20.5 -151 L-7 -151 Z" fill="#7A4128"/>
+          <circle cx="0" cy="-142" r="20" style="fill:var(--skin,#F2C19B)" stroke="#233049" stroke-width="3"/>
+          <path d="M-20 -149 C-23 -140 -21 -130 -14.5 -124.5 C-12 -133 -11 -141 -5 -149 Z" style="fill:var(--hair,#7A4128)" stroke="#233049" stroke-width="2.5" stroke-linejoin="round"/>
+          <path d="M-7 -150 Q2 -140 9 -148.5 Q14 -142 20.5 -147.5 L20.5 -151 L-7 -151 Z" style="fill:var(--hair,#7A4128)"/>
           <ellipse cx="6" cy="-142.5" rx="2.6" ry="3.4" fill="#233049"/>
           <ellipse cx="14" cy="-142.5" rx="2.6" ry="3.4" fill="#233049"/>
           <path d="M8.2 -145.5 L10.2 -148 M16.2 -145.5 L18.2 -148" stroke="#233049" stroke-width="1.7" stroke-linecap="round"/>
@@ -79,6 +79,12 @@
           <path d="M5.5 -133.5 Q11 -128.5 16 -133.5" fill="none" stroke="#C2415B" stroke-width="2.6" stroke-linecap="round"/>
           <use href="#hardhat"/>
         </g>
+        <g id="bust">
+          <rect x="-25" y="-122" width="48" height="66" rx="15" fill="#3E8E5E" stroke="#233049" stroke-width="3"/>
+          <path d="M-25 -104 Q-25 -120 -12 -121 L-5 -121 L-1 -101 L3 -121 L10 -121 Q23 -120 23 -104 L23 -60 L-25 -60 Z" fill="#FF8A2B" stroke="#233049" stroke-width="3" stroke-linejoin="round"/>
+        </g>
+        <g id="portrait-man"><use href="#bust"/><use href="#head-man"/></g>
+        <g id="portrait-woman"><use href="#bust"/><use href="#head-woman"/></g>
       </defs>
 
       <!-- Sky -->
@@ -191,7 +197,7 @@
         <g id="workerBob">
           <g stroke="#233049" stroke-width="2.5">
             <rect x="-22" y="-114" width="12" height="46" rx="6" fill="#357A52"/>
-            <circle cx="-16" cy="-66" r="6.5" fill="#F2C19B"/>
+            <circle cx="-16" cy="-66" r="6.5" style="fill:var(--skin,#F2C19B)"/>
           </g>
           <g class="leg leg-a" stroke="#233049" stroke-width="2.5">
             <rect x="-14" y="-62" width="13" height="54" rx="6" fill="#2A5448"/>
@@ -213,7 +219,7 @@
             <path d="M2 -35 L-16 -42 C-23 -32 -23 -18 -16 -8 L2 -15 Z" fill="#C3CED6" stroke="#233049" stroke-width="2.5" stroke-linejoin="round"/>
             <path d="M-16 -39 C-20 -30 -20 -19 -16 -11" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
             <rect x="-2" y="-115" width="12" height="52" rx="6" fill="#3E8E5E" stroke="#233049" stroke-width="2.5"/>
-            <circle cx="4" cy="-64" r="7" fill="#F2C19B" stroke="#233049" stroke-width="2.5"/>
+            <circle cx="4" cy="-64" r="7" style="fill:var(--skin,#F2C19B)" stroke="#233049" stroke-width="2.5"/>
           </g>
           <g transform="translate(26 -192)">
             <g id="bubble"><g id="bubbleInner">
@@ -283,6 +289,9 @@
       <div class="pill hud-center" id="levelEl">Level: 1</div>
       <div class="hud-right" id="timeWrap">
         <div class="pill" id="timeEl">Time: 8.0</div>
+        <button class="icon-btn" id="leaveBtn" type="button" aria-label="Quit game" title="Quit game (Esc)" data-action="quitAsk">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4"/><path d="M9 8l-4 4 4 4M5 12h11"/></svg>
+        </button>
         <button class="icon-btn" id="muteBtn" type="button" aria-label="Toggle sound" data-action="sound">
           <svg class="ic-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9z" fill="currentColor"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19.5 5.5a9 9 0 0 1 0 13"/></svg>
           <svg class="ic-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9z" fill="currentColor"/><path d="M17 9l5 6M22 9l-5 6"/></svg>
@@ -311,33 +320,39 @@
         <div class="row"><span class="t" style="--i:7">C</span><span class="t" style="--i:8">A</span><span class="t" style="--i:9">T</span></div>
       </div>
       <p class="tagline">Type fast. Save the cat!</p>
-      <p class="pick-label" id="pickLabel">Choose your park worker</p>
-      <div class="picker" role="group" aria-labelledby="pickLabel">
-        <button class="pick" type="button" data-action="gender" data-gender="man" aria-pressed="true">
-          <svg viewBox="-40 -178 72 60" aria-hidden="true">
-            <rect x="-25" y="-122" width="48" height="66" rx="15" fill="#3E8E5E" stroke="#233049" stroke-width="3"/>
-            <path d="M-25 -104 Q-25 -120 -12 -121 L-5 -121 L-1 -101 L3 -121 L10 -121 Q23 -120 23 -104 L23 -60 L-25 -60 Z" fill="#FF8A2B" stroke="#233049" stroke-width="3" stroke-linejoin="round"/>
-            <use href="#head-man"/>
-          </svg>
-          <span>MAN</span>
-        </button>
-        <button class="pick" type="button" data-action="gender" data-gender="woman" aria-pressed="false">
-          <svg viewBox="-40 -178 72 60" aria-hidden="true">
-            <rect x="-25" y="-122" width="48" height="66" rx="15" fill="#3E8E5E" stroke="#233049" stroke-width="3"/>
-            <path d="M-25 -104 Q-25 -120 -12 -121 L-5 -121 L-1 -101 L3 -121 L10 -121 Q23 -120 23 -104 L23 -60 L-25 -60 Z" fill="#FF8A2B" stroke="#233049" stroke-width="3" stroke-linejoin="round"/>
-            <use href="#head-woman"/>
-          </svg>
-          <span>WOMAN</span>
-        </button>
+      <div class="acct-user">
+        <span id="soloFace"></span>
+        <div class="acct-info"><b id="soloName">Player</b><span id="soloStats"></span></div>
       </div>
       <div class="btns">
         <button class="btn" type="button" data-action="start">START GAME</button>
         <button class="btn alt" type="button" data-action="howto">HOW TO PLAY</button>
         <button class="btn plain" type="button" data-action="sound" id="soundBtn">SOUND ON</button>
-        <a class="btn plain duel-link" href="../index.html">TWO-PLAYER DUEL</a>
-        <a class="btn plain duel-link" href="../index.html#leaderboard" id="soloBoardLink" hidden>LEADERBOARD</a>
+        <a class="btn plain duel-link" href="../index.html#leaderboard" id="soloBoardLink">LEADERBOARD</a>
+        <a class="btn plain duel-link" href="../index.html" data-back>BACK TO MAIN MENU</a>
       </div>
       <p class="best-line" id="menuBest"></p>
+    </div>
+  </section>
+
+  <section class="screen" id="gate" hidden>
+    <div class="panel">
+      <h2>Sign in first</h2>
+      <p class="sub" id="gateText">You need an account to play. Sign in or create one on the main page, then come back.</p>
+      <div class="btns">
+        <a class="btn duel-link" href="../index.html">GO TO SIGN IN</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" id="confirm" hidden>
+    <div class="panel">
+      <h2>Game paused</h2>
+      <p class="sub">Quit now? Your score in this game won't be saved.</p>
+      <div class="btns">
+        <button class="btn" type="button" data-action="resumeGame" data-back>KEEP PLAYING</button>
+        <button class="btn plain" type="button" data-action="quitGame">QUIT GAME</button>
+      </div>
     </div>
   </section>
 
@@ -353,6 +368,7 @@
       <p class="sub" style="margin-top:16px">No clicking needed. Just start typing. Backspace fixes a wrong letter, but each mistake costs time.</p>
       <div class="btns">
         <button class="btn" type="button" data-action="start">START</button>
+        <button class="btn plain" type="button" data-action="menu" data-back>BACK</button>
       </div>
     </div>
   </section>
@@ -369,7 +385,7 @@
       <p class="online-line" id="goOnline" aria-live="polite"></p>
       <div class="btns">
         <button class="btn" type="button" data-action="start">PLAY AGAIN</button>
-        <button class="btn plain" type="button" data-action="menu">MAIN MENU</button>
+        <button class="btn plain" type="button" data-action="menu" data-back>MAIN MENU</button>
       </div>
     </div>
   </section>
@@ -385,7 +401,7 @@
       <p class="online-line" id="winOnline" aria-live="polite"></p>
       <div class="btns">
         <button class="btn" type="button" data-action="start">PLAY AGAIN</button>
-        <button class="btn plain" type="button" data-action="menu">MAIN MENU</button>
+        <button class="btn plain" type="button" data-action="menu" data-back>MAIN MENU</button>
       </div>
     </div>
   </section>
@@ -393,6 +409,7 @@
 
 <script src="../words.js"></script>
 <script src="../wordbank.js"></script>
+<script src="../avatar.js"></script>
 <script src="script.js"></script>
 </body>
 </html>

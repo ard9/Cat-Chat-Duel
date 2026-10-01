@@ -7,6 +7,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const Avatar = require('./public/avatar.js');
 
 // node:sqlite prints an "experimental" warning on load; hide only that one.
 const origEmitWarning = process.emitWarning;
@@ -101,7 +102,10 @@ const MIGRATIONS = [
    INSERT INTO match_players (match_id, seat, user_id, name, score, place, delta)
      SELECT id, 0, p1_user, p1_name, p1_score, CASE WHEN winner IS NULL OR winner = 0 THEN 1 ELSE 2 END, p1_delta FROM matches;
    INSERT INTO match_players (match_id, seat, user_id, name, score, place, delta)
-     SELECT id, 1, p2_user, p2_name, p2_score, CASE WHEN winner IS NULL OR winner = 1 THEN 1 ELSE 2 END, p2_delta FROM matches;`
+     SELECT id, 1, p2_user, p2_name, p2_score, CASE WHEN winner IS NULL OR winner = 1 THEN 1 ELSE 2 END, p2_delta FROM matches;`,
+
+  // v3: avatars (character, skin, hard hat and hair colour) as JSON
+  `ALTER TABLE users ADD COLUMN avatar TEXT NOT NULL DEFAULT '';`
 ];
 
 class UserError extends Error { constructor(msg){ super(msg); this.userMessage = msg; } }
@@ -122,8 +126,9 @@ const sha256 = s => crypto.createHash('sha256').update(s).digest('hex');
 
 function publicUser(r){
   if (!r) return null;
+  const avatar = Avatar.normalize(r.avatar, r.gender);
   return {
-    id: r.id, username: r.username, gender: r.gender,
+    id: r.id, username: r.username, gender: avatar.g, avatar,
     rating: r.rating, peakRating: r.peak_rating,
     matches: r.matches, wins: r.wins, losses: r.losses, draws: r.draws, bestDuel: r.best_duel,
     soloBest: r.solo_best, soloLevel: r.solo_level, soloRuns: r.solo_runs,
@@ -153,10 +158,13 @@ class Store {
     this.s = {
       userById:      q('SELECT * FROM users WHERE id = ?'),
       userByName:    q('SELECT * FROM users WHERE username_lc = ?'),
-      insertUser:    q(`INSERT INTO users (username, username_lc, pass_hash, pass_salt, gender, created_at, last_seen)
-                        VALUES (?, ?, ?, ?, ?, ?, ?)`),
+      insertUser:    q(`INSERT INTO users (username, username_lc, pass_hash, pass_salt, gender, avatar, created_at, last_seen)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`),
       touchUser:     q('UPDATE users SET last_seen = ? WHERE id = ?'),
       setGender:     q('UPDATE users SET gender = ? WHERE id = ?'),
+      setAvatar:     q('UPDATE users SET avatar = ?, gender = ? WHERE id = ?'),
+      setPassword:   q('UPDATE users SET pass_hash = ?, pass_salt = ? WHERE id = ?'),
+      otherSessions: q('DELETE FROM sessions WHERE user_id = ? AND token_hash != ?'),
       insertSession: q('INSERT INTO sessions (token_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)'),
       session:       q('SELECT user_id, expires_at FROM sessions WHERE token_hash = ?'),
       deleteSession: q('DELETE FROM sessions WHERE token_hash = ?'),
@@ -172,9 +180,9 @@ class Store {
       applySolo:     q(`UPDATE users SET solo_runs = solo_runs + 1,
                           solo_level = CASE WHEN ? > solo_best THEN ? ELSE solo_level END,
                           solo_best  = MAX(solo_best, ?) WHERE id = ?`),
-      topDuel:       q(`SELECT username, gender, rating, matches, wins, losses, draws FROM users
+      topDuel:       q(`SELECT username, gender, avatar, rating, matches, wins, losses, draws FROM users
                         WHERE matches > 0 ORDER BY rating DESC, wins DESC, matches ASC LIMIT ?`),
-      topSolo:       q(`SELECT username, gender, solo_best, solo_level FROM users
+      topSolo:       q(`SELECT username, gender, avatar, solo_best, solo_level FROM users
                         WHERE solo_best > 0 ORDER BY solo_best DESC, solo_level DESC LIMIT ?`),
       rankDuel:      q('SELECT COUNT(*) + 1 AS r FROM users WHERE matches > 0 AND rating > ?'),
       rankSolo:      q('SELECT COUNT(*) + 1 AS r FROM users WHERE solo_best > ?'),
@@ -195,7 +203,7 @@ class Store {
   purge(){ this.s.purgeSessions.run(Date.now()); }
 
   /* ---------- accounts ---------- */
-  async register(username, password, gender){
+  async register(username, password, gender, avatar){
     const u = normName(username);
     checkUsername(u);
     checkPassword(password);
@@ -205,7 +213,8 @@ class Store {
     const hash = (await scrypt(password, salt)).toString('hex');
     const now = Date.now();
     try {
-      const r = this.s.insertUser.run(u, lc, hash, salt, gender === 'woman' ? 'woman' : 'man', now, now);
+      const av = Avatar.normalize(avatar, gender);
+      const r = this.s.insertUser.run(u, lc, hash, salt, av.g, JSON.stringify(av), now, now);
       return publicUser(this.s.userById.get(Number(r.lastInsertRowid)));
     } catch (e){
       if (/UNIQUE/.test(e.message)) throw new UserError('That username is already taken.');
@@ -238,6 +247,25 @@ class Store {
   deleteSession(token){ if (typeof token === 'string') this.s.deleteSession.run(sha256(token)); }
   user(id){ return publicUser(this.s.userById.get(id)); }
   setGender(id, g){ this.s.setGender.run(g === 'woman' ? 'woman' : 'man', id); }
+  setAvatar(id, avatar){
+    const av = Avatar.normalize(avatar);
+    this.s.setAvatar.run(JSON.stringify(av), av.g, id);
+    return this.user(id);
+  }
+  async changePassword(id, currentToken, oldPassword, newPassword){
+    const row = this.s.userById.get(id);
+    if (!row) throw new UserError('Account not found.');
+    const key = await scrypt(String(oldPassword || ''), row.pass_salt);
+    const stored = Buffer.from(row.pass_hash, 'hex');
+    if (stored.length !== key.length || !crypto.timingSafeEqual(stored, key)) throw new UserError('Your current password is not correct.');
+    checkPassword(newPassword);
+    if (newPassword === oldPassword) throw new UserError('The new password must be different.');
+    const salt = crypto.randomBytes(16).toString('hex');
+    const hash = (await scrypt(newPassword, salt)).toString('hex');
+    this.s.setPassword.run(hash, salt, id);
+    this.s.otherSessions.run(id, sha256(currentToken || ''));    // sign out every other device
+    return true;
+  }
 
   /* ---------- duels and group matches ---------- */
   // seats: [{ userId|null, name, score, place }, ...]  (place 1 = best; equal places are ties)
@@ -291,9 +319,9 @@ class Store {
   /* ---------- leaderboards ---------- */
   leaderboard(type, limit = 50){
     if (type === 'solo'){
-      return this.s.topSolo.all(limit).map((r, i) => ({ rank: i + 1, username: r.username, gender: r.gender, score: r.solo_best, level: r.solo_level }));
+      return this.s.topSolo.all(limit).map((r, i) => ({ rank: i + 1, username: r.username, avatar: Avatar.normalize(r.avatar, r.gender), score: r.solo_best, level: r.solo_level }));
     }
-    return this.s.topDuel.all(limit).map((r, i) => ({ rank: i + 1, username: r.username, gender: r.gender, rating: r.rating,
+    return this.s.topDuel.all(limit).map((r, i) => ({ rank: i + 1, username: r.username, avatar: Avatar.normalize(r.avatar, r.gender), rating: r.rating,
       matches: r.matches, wins: r.wins, losses: r.losses, draws: r.draws }));
   }
   rank(userId, type){

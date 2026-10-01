@@ -14,6 +14,7 @@ const path = require('path');
 const crypto = require('crypto');
 const os = require('os');
 const Database = require('./db');
+const Avatar = require('./public/avatar.js');
 
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
@@ -24,6 +25,13 @@ const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'data', 'savethecat.
 let DB = null;
 try { DB = Database.open(DB_PATH); }
 catch (e){ console.error('  Could not open the database:', e.message); DB = null; }
+if (!DB){
+  // Every player needs an account, so the game cannot run without the database.
+  console.error('\n  Save the Cat needs its database for player accounts, but it could not be started.');
+  console.error(Database.available() ? '  Check that the data folder is writable: ' + path.dirname(DB_PATH)
+                                     : '  Please install Node.js 22.13 or newer (it includes SQLite): https://nodejs.org');
+  process.exit(1);
+}
 
 /* ---------------------------------------------------------
    GAME CONFIG — tweak the duel here
@@ -129,7 +137,7 @@ async function handleApi(req, res, url){
       case 'POST /api/register': {
         if (limited('reg:' + ip, 5, 3600e3)) return json(res, 429, { error: 'Too many new accounts from this network. Try again later.' });
         const b = await readJson(req);
-        const user = await DB.register(b.username, b.password, b.gender);
+        const user = await DB.register(b.username, b.password, b.gender, b.avatar);
         return json(res, 200, { token: DB.createSession(user.id), user });
       }
       case 'POST /api/login': {
@@ -147,6 +155,23 @@ async function handleApi(req, res, url){
         const user = DB.userBySession(bearer(req));
         if (!user) return json(res, 401, { error: 'Not signed in.' });
         return json(res, 200, { user, rank: { duel: DB.rank(user.id, 'duel'), solo: DB.rank(user.id, 'solo') }, recent: DB.recentMatches(user.id, 5) });
+      }
+      case 'POST /api/avatar': {
+        const user = DB.userBySession(bearer(req));
+        if (!user) return json(res, 401, { error: 'Not signed in.' });
+        const b = await readJson(req);
+        const updated = DB.setAvatar(user.id, b.avatar);
+        refreshLivePlayers(updated);
+        return json(res, 200, { user: updated });
+      }
+      case 'POST /api/password': {
+        const token = bearer(req);
+        const user = DB.userBySession(token);
+        if (!user) return json(res, 401, { error: 'Not signed in.' });
+        if (limited('pw:' + user.id, 5, 600e3)) return json(res, 429, { error: 'Too many attempts. Wait a few minutes and try again.' });
+        const b = await readJson(req);
+        await DB.changePassword(user.id, token, b.current, b.password);
+        return json(res, 200, { ok: true });
       }
       case 'GET /api/leaderboard': {
         const type = url.searchParams.get('type') === 'solo' ? 'solo' : 'duel';
@@ -339,12 +364,13 @@ const cleanGender = g => g === 'woman' ? 'woman' : 'man';
 const validToken = t => typeof t === 'string' && /^[a-f0-9]{16,64}$/.test(t);
 
 function send(p, msg){ if (p && p.conn) p.conn.send(msg); }
-function broadcast(room, msg){ room.players.forEach(p => send(p, msg)); }
+// players who left keep their seat until the match ends, but they no longer receive its messages
+function broadcast(room, msg){ room.players.forEach(p => { if (p.room === room) send(p, msg); }); }
 function sendRoom(room){
-  const info = room.players.map((p, i) => ({ name: p.name, gender: p.gender, away: !p.conn, registered: !!p.userId,
+  const info = room.players.map((p, i) => ({ name: p.name, gender: p.gender, avatar: p.avatar || Avatar.DEFAULT, away: !p.conn, registered: !!p.userId,
                                              rating: p.userId ? p.rating : null, left: !!(room.left && room.left[i]) }));
   const startsIn = room.startsAt ? Math.max(0, room.startsAt - Date.now()) : null;
-  room.players.forEach((p, i) => send(p, { t: 'room', code: room.code, quick: room.quick, you: i, players: info, state: room.state,
+  room.players.forEach((p, i) => p.room === room && send(p, { t: 'room', code: room.code, quick: room.quick, you: i, players: info, state: room.state,
                                            startsIn, max: MAX_PLAYERS, min: MIN_PLAYERS }));
 }
 function clearTimers(room){ room.timers.forEach(clearTimeout); room.timers = []; }
@@ -358,19 +384,29 @@ function newRoom(quick){
   rooms.set(code, room);
   return room;
 }
-function setProfile(p, msg){
-  p.gender = cleanGender(msg.gender);
-  if (p.userId){ p.name = p.username; if (DB) DB.setGender(p.userId, p.gender); }
-  else p.name = cleanName(msg.name);
+// Name and look always come from the player's account.
+function setProfile(p){
+  if (!p.userId) return;
+  const u = DB.user(p.userId);
+  if (u){ p.name = u.username; p.avatar = u.avatar; p.gender = u.avatar.g; p.rating = u.rating; }
 }
 function attachAccount(p, authToken){
-  const user = DB && authToken ? DB.userBySession(authToken) : null;
+  const user = authToken ? DB.userBySession(authToken) : null;
   p.userId = user ? user.id : null;
   p.username = user ? user.username : null;
   p.rating = user ? user.rating : null;
-  if (user){ p.name = user.username; p.gender = user.gender; }
+  if (user){ p.name = user.username; p.avatar = user.avatar; p.gender = user.avatar.g; }
   return user;
 }
+// after an avatar change, update the player everywhere they are connected
+function refreshLivePlayers(user){
+  for (const p of playersByToken.values()){
+    if (p.userId !== user.id) continue;
+    p.avatar = user.avatar; p.gender = user.avatar.g;
+    if (p.room && !PLAYING.includes(p.room.state)) sendRoom(p.room);
+  }
+}
+const needAccount = p => { if (p.userId) return false; send(p, { t: 'error', code: 'auth', message: 'Please sign in to play.' }); return true; };
 const aliveIdx = room => room.players.map((_, i) => i).filter(i => !room.out[i]);
 
 /* ---------- match flow ---------- */
@@ -519,7 +555,7 @@ function endMatch(room, reason){
   room.lastOver = {
     t: 'over', reason, level: room.level, ranked: rec ? rec.ranked : false,
     winner: firsts.length === 1 ? firsts[0] : null,
-    standings: order.map(i => ({ p: i, name: room.players[i].name, gender: room.players[i].gender, score: room.scores[i], place: place[i],
+    standings: order.map(i => ({ p: i, name: room.players[i].name, gender: room.players[i].gender, avatar: room.players[i].avatar || Avatar.DEFAULT, score: room.scores[i], place: place[i],
                                  out: !!room.out[i], left: !!room.left[i], registered: !!room.players[i].userId,
                                  delta: rec ? rec.deltas[i] : 0, rating: rec ? rec.ratings[i] : null }))
   };
@@ -620,7 +656,7 @@ function launchQuick(r){
 /* ---------- connections ---------- */
 function newPlayer(conn, token){
   const p = { token: token || crypto.randomBytes(16).toString('hex'), name: 'Player', gender: 'man', conn, room: null, graceTimer: null,
-              userId: null, username: null, rating: null, rtt: 0 };
+              userId: null, username: null, rating: null, avatar: Avatar.DEFAULT, rtt: 0 };
   playersByToken.set(p.token, p);
   conn.player = p;
   return p;
@@ -690,7 +726,8 @@ function onConnection(conn){
         break;
       }
       case 'create': {
-        leaveRoom(p); setProfile(p, msg);
+        if (needAccount(p)) return;
+        leaveRoom(p); setProfile(p);
         const r = newRoom(false);
         if (!r) return send(p, { t: 'error', message: 'The server is full. Try again in a minute.' });
         r.players.push(p); p.room = r;
@@ -698,6 +735,7 @@ function onConnection(conn){
         break;
       }
       case 'join': {
+        if (needAccount(p)) return;
         const code = String(msg.code || '').toUpperCase().replace(/[^A-Z]/g, '');
         const r = rooms.get(code);
         if (!r || r.quick) return send(p, { t: 'error', message: `No room with code ${code || '?'}. Check the code and try again.` });
@@ -705,20 +743,22 @@ function onConnection(conn){
         if (r.state !== 'lobby') return send(p, { t: 'error', message: 'That room is in the middle of a match. Try again when it ends.' });
         if (r.players.length >= MAX_PLAYERS) return send(p, { t: 'error', message: `That room is full (${MAX_PLAYERS} players).` });
         if (p.userId && r.players.some(o => o.userId === p.userId)) return send(p, { t: 'error', message: 'You are already in this room in another tab.' });
-        leaveRoom(p); setProfile(p, msg);
+        leaveRoom(p); setProfile(p);
         r.players.push(p); p.room = r;
         sendRoom(r);
         break;
       }
       case 'quick':
-        leaveRoom(p); setProfile(p, msg);
+        if (needAccount(p)) return;
+        leaveRoom(p); setProfile(p);
         quickJoin(p);
         break;
       case 'auth': {
         if (room && PLAYING.includes(room.state)) return send(p, { t: 'error', message: 'Finish this match before switching accounts.' });
         const user = attachAccount(p, msg.auth);
         send(p, { t: 'authed', user });
-        if (room) sendRoom(room);
+        if (room && !user) leaveRoom(p);          // signed out: leave the room too
+        else if (room) sendRoom(room);
         break;
       }
       case 'start':
@@ -745,7 +785,7 @@ server.listen(PORT, HOST, () => {
   ips.forEach(ip => console.log(`  On your network:    http://${ip}:${PORT}`));
   if (!ips.length) console.log('  (No network address found. Connect to Wi-Fi or a hotspot to play on two devices.)');
   console.log(`\n  Words: ${BANK.size} (${CUSTOM.length} from custom-words.txt${BANK.mode === 'only' ? ', custom only' : ''})`);
-  if (DB){ const st = DB.stats(); console.log(`\n  Database: ${DB_PATH}  (${st.users} players, ${st.matches} matches)`); }
-  else console.log('\n  Database: OFF. Accounts and leaderboards need Node.js 22.13 or newer.');
+  const st = DB.stats(); console.log(`\n  Database: ${DB_PATH}  (${st.users} players, ${st.matches} matches)`);
+  console.log('  Players must sign in (or create an account) before they can play.');
   console.log('\n  Open one of the network addresses on the second device.\n  Press Ctrl+C to stop.\n');
 });

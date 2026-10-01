@@ -113,6 +113,9 @@ const Sfx = (() => {
   };
 })();
 
+const AV = window.STCAvatar;
+const myAvatar = () => (Auth.user && Auth.user.avatar) || AV.DEFAULT;
+
 /* =========================================================
    Scene decoration
    ========================================================= */
@@ -202,7 +205,11 @@ class Scene {
   applyCat(){ this.catBody.setAttribute('transform', `translate(${this.c.shake.toFixed(2)} ${this.c.jump.toFixed(2)})`); }
   applyAll(){ this.applyBranch(); this.applyWorker(); this.applyAxe(); this.applyCat(); }
   setCat(m){ if (this.catEl.dataset.mood !== m) this.catEl.dataset.mood = m; }
-  setGender(g){ this.headUse.setAttribute('href', '#head-' + (g === 'woman' ? 'woman' : 'man')); }
+  setAvatar(a){
+    const v = AV.normalize(a);
+    this.headUse.setAttribute('href', '#head-' + v.g);
+    AV.apply(this.workerEl, v);
+  }
   setLevel(l){
     this.level = l;
     this.svg.classList.toggle('windy', l >= 5);
@@ -504,7 +511,7 @@ class RivalCard {
     const el = this.el = document.createElement('div');
     el.className = 'rcard';
     el.innerHTML = `${MINI}<div class="rinfo">
-        <div class="rname"><span class="nm"></span><span class="ptag"></span></div>
+        <div class="rname"><span class="rface"></span><span class="nm"></span><span class="ptag"></span></div>
         <div class="rrow"><span class="rscore">0</span><span class="pnet"></span></div>
         <div class="meter"><b><i></i></b></div>
         <div class="rprog"></div>
@@ -515,6 +522,8 @@ class RivalCard {
   }
   update(p){
     this.q('.nm').textContent = p ? p.name : '';
+    const key = p ? JSON.stringify(p.avatar) : '';
+    if (key !== this.avKey){ this.avKey = key; this.q('.rface').innerHTML = p ? AV.portrait(p.avatar, 'rface-svg') : ''; }
     const tag = this.q('.ptag');
     tag.className = 'ptag' + (p && !p.registered && Auth.enabled ? ' guest' : '');
     tag.textContent = !p || !Auth.enabled ? '' : p.registered ? String(p.rating) : 'GUEST';
@@ -597,21 +606,22 @@ function setLayout(){
 function plateFor(i){ return i === S.me ? sides.me : (duo() && i === duoRival() ? sides.opp : null); }
 function updatePlates(){
   const meP = S.players[S.me];
-  const paint = (side, i, p, fallbackGender) => {
+  const paint = (side, i, p, fallback) => {
     side.querySelector('.nm').textContent = p ? p.name : nameOf(i);
-    const g = p ? p.gender : fallbackGender;
-    side.querySelector('.faceUse').setAttribute('href', '#portrait-' + g);
+    const av = AV.normalize(p ? p.avatar : fallback);
+    side.querySelector('.faceUse').setAttribute('href', '#portrait-' + av.g);
+    AV.apply(side.querySelector('.face'), av);
     const tag = side.querySelector('.ptag');
     tag.className = 'ptag' + (p && !p.registered && Auth.enabled ? ' guest' : '');
     tag.textContent = !p || !Auth.enabled ? '' : p.registered ? String(p.rating) : 'GUEST';
     side.querySelector('.pscore').textContent = S.scores[i] || 0;
     side.querySelector('.meter i').style.setProperty('--d', Math.round(Math.min(1, S.danger[i] || 0) * 100) + '%');
-    return g;
+    return av;
   };
-  sceneMe.setGender(paint(sides.me, S.me, meP, S.profile.gender));
+  sceneMe.setAvatar(paint(sides.me, S.me, meP, myAvatar()));
   if (duo()){
     const r = duoRival();
-    sceneOpp.setGender(paint(sides.opp, r, S.players[r], S.profile.gender === 'man' ? 'woman' : 'man'));
+    sceneOpp.setAvatar(paint(sides.opp, r, S.players[r], { g: myAvatar().g === 'man' ? 'woman' : 'man', hat: 2 }));
   }
   refreshCards();
 }
@@ -742,15 +752,15 @@ const Auth = {
   signIn(token, user){
     this.token = token; this.user = user;
     store.set('stc.auth', token);
-    if (user && user.gender) setGender(user.gender);
     renderAccount();
     Net.send({ t: 'auth', auth: token });
   },
-  signOut(){
+  signOut(message){
+    const wasIn = !!this.user;
     this.token = null; this.user = null;
     store.set('stc.auth', null);
-    renderAccount();
     Net.send({ t: 'auth', auth: null });
+    if (wasIn || message) showAuth(message);
   },
   async refresh(){
     if (!this.enabled || !this.token) return null;
@@ -760,17 +770,13 @@ const Auth = {
 };
 function renderAccount(){
   const u = Auth.user;
-  $('#acctGuest').hidden = !!u;
-  $('#acctUser').hidden = !u;
-  $('#acctCta').hidden = !Auth.enabled;
-  $('#boardBtn').hidden = !Auth.enabled;
-  if (u){
-    $('#acctName').textContent = u.username;
-    $('#acctFace').setAttribute('href', '#portrait-' + u.gender);
-    $('#acctStats').textContent = u.matches
-      ? `Rating ${u.rating}, ${plural(u.wins, 'win')} in ${plural(u.matches, 'match', 'matches')}`
-      : `Rating ${u.rating}. Play a match to get ranked.`;
-  }
+  if (!u) return;
+  $('#acctName').textContent = u.username;
+  $('#acctFace').innerHTML = AV.portrait(u.avatar, 'acct-face');
+  $('#acctStats').textContent = u.matches
+    ? `Rating ${u.rating}, ${plural(u.wins, 'win')} in ${plural(u.matches, 'match', 'matches')}`
+    : `Rating ${u.rating}. Play a match to get ranked.`;
+  if (!S.players.length) sceneMe.setAvatar(u.avatar);
 }
 
 /* =========================================================
@@ -843,6 +849,7 @@ function freezeRound(){
 function onMessage(m){
   switch (m.t){
     case 'error':
+      if (m.code === 'auth'){ Auth.signOut('Please sign in again to play.'); break; }
       setErr(!$('#join').hidden ? '#joinErr' : '#menuErr', m.message);
       if (S.state === 'queue') toMenu();
       break;
@@ -936,7 +943,7 @@ function renderQueue(){
     const p = S.players[k];
     const d = document.createElement('div');
     d.className = 'qslot' + (p ? ' filled' : '') + (k === S.me ? ' me' : '');
-    d.innerHTML = p ? `<svg viewBox="-40 -178 72 60" aria-hidden="true"><use href="#portrait-${p.gender}"/></svg><span class="who"></span>`
+    d.innerHTML = p ? `${AV.portrait(p.avatar)}<span class="who"></span>`
                     : '<span class="qmark">?</span><span class="who"></span>';
     d.querySelector('.who').textContent = p ? (k === S.me ? 'You' : p.name) : '';
     box.appendChild(d);
@@ -971,7 +978,7 @@ function renderLobby(){
     const tag = p.away ? 'Reconnecting…' : i === S.me ? (i === 0 ? 'You, host' : 'You') : i === 0 ? 'Host'
               : p.registered && Auth.enabled ? `Rating ${p.rating}` : Auth.enabled ? 'Guest' : 'Player';
     d.className = 'slot filled' + (i === S.me ? ' me' : '');
-    d.innerHTML = `<svg viewBox="-40 -178 72 60" aria-hidden="true"><use href="#portrait-${p.gender}"/></svg><span class="who"></span><span class="tag"></span>`;
+    d.innerHTML = `${AV.portrait(p.avatar)}<span class="who"></span><span class="tag"></span>`;
     d.querySelector('.who').textContent = p.name;
     d.querySelector('.tag').textContent = tag;
     slotsEl.appendChild(d);
@@ -1190,7 +1197,7 @@ async function onOver(m){
   m.standings.forEach(s => {
     const li = document.createElement('li');
     if (s.p === S.me) li.className = 'me';
-    li.innerHTML = `<span class="rk">${s.place}</span><svg viewBox="-40 -178 72 60" aria-hidden="true"><use href="#portrait-${s.gender === 'woman' ? 'woman' : 'man'}"/></svg>
+    li.innerHTML = `<span class="rk">${s.place}</span>${AV.portrait(s.avatar)}
       <span><span class="who"></span><span class="sub2"></span></span><span class="val"></span>`;
     li.querySelector('.who').textContent = s.name + (s.p === S.me ? ' (you)' : '');
     const bits = [];
@@ -1242,7 +1249,7 @@ async function onSocketLost(){
       const h = await Net.connect();
       reconnecting = false;
       if (h.resumed){ $('#reconnect').hidden = true; return; }
-      if (wasQueue){ $('#reconnect').hidden = true; Net.send(Object.assign({ t: 'quick' }, profileMsg())); return; }
+      if (wasQueue){ $('#reconnect').hidden = true; Net.send({ t: 'quick' }); return; }
       break;
     } catch (e){}
     await new Promise(r => setTimeout(r, 1500));
@@ -1263,6 +1270,7 @@ function lostConnection(text){
 }
 function toMenu(){
   if (S.code || S.state === 'queue') Net.send({ t: 'leave' });
+  hideConfirm();
   G.gen++;
   sceneMe.reset(); sceneOpp.reset();
   clearWord(); hideAway(); clearInterval(queueTimer); setSpectating(false);
@@ -1273,7 +1281,20 @@ function toMenu(){
   shoutEl.className = ''; banner.classList.remove('show');
   setErr('#menuErr', ''); setErr('#joinErr', '');
   updatePlates();
+  if (!Auth.user) return showAuth();
+  renderAccount();
   showScreen('menu');
+}
+function showAuth(message){
+  G.gen++;
+  if (S.code || S.state === 'queue') Net.send({ t: 'leave' });
+  S.state = 'menu'; S.code = ''; S.players = [];
+  Session.inMatch = false;
+  app.dataset.mode = 'menu';
+  hideAway(); clearWord(); hideConfirm();
+  setAuthTab(authMode);
+  setErr('#authErr', message || '');
+  showScreen('auth');
 }
 
 /* =========================================================
@@ -1347,9 +1368,16 @@ document.addEventListener('keydown', e => {
   if (tag === 'INPUT' || tag === 'TEXTAREA'){
     if (e.key === 'Enter'){
       if (e.target.id === 'codeInput') act('join');
-      else if (e.target.id === 'nameInput') act('quick', e.target);
       else if (/^authPass2?$|^authUser$/.test(e.target.id)) submitAuth();
+      else if (/^pw/.test(e.target.id)) changePassword();
     }
+    if (e.key !== 'Escape') return;
+  }
+  if (e.key === 'Escape'){
+    const sc = visibleScreen();
+    const back = sc && sc.querySelector('[data-back]');
+    if (back && !back.disabled){ e.preventDefault(); back.click(); return; }
+    if (!sc && inMatch()){ e.preventDefault(); askLeave(); return; }
     return;
   }
   if (app.dataset.mode !== 'game') return;
@@ -1361,27 +1389,40 @@ document.addEventListener('keydown', e => {
 /* =========================================================
    Buttons
    ========================================================= */
-const nameInput = $('#nameInput'), codeInput = $('#codeInput');
-nameInput.value = S.profile.name;
+const codeInput = $('#codeInput');
 codeInput.addEventListener('input', () => { codeInput.value = codeInput.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4); });
-function saveProfile(){
-  S.profile.name = nameInput.value.trim().slice(0, 14);
-  store.set('stc.name', S.profile.name);
-}
-function profileMsg(){ return { name: (Auth.user && Auth.user.username) || S.profile.name || 'Player', gender: S.profile.gender }; }
-function setGender(g){
-  S.profile.gender = g === 'woman' ? 'woman' : 'man';
-  store.set('stc.worker', S.profile.gender);
-  if (Auth.user && Auth.user.gender !== S.profile.gender){ Auth.user.gender = S.profile.gender; renderAccount(); }
-  document.querySelectorAll('.pick').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.gender === S.profile.gender)));
-  if (!S.players.length) sceneMe.setGender(S.profile.gender);
-}
 function updateSoundUI(){
   const m = Sfx.isMuted();
   app.classList.toggle('muted', m);
   $('#soundBtn').textContent = m ? 'SOUND OFF' : 'SOUND ON';
   $('#muteBtn').setAttribute('aria-label', m ? 'Turn sound on' : 'Turn sound off');
 }
+/* where BACK goes from each screen */
+let backTarget = 'menu';
+function openScreen(id, from){ backTarget = from || 'menu'; showScreen(id); }
+function goBack(){
+  const target = backTarget;
+  backTarget = 'menu';
+  if (target === 'auth' || !Auth.user) return showAuth();
+  if (target === 'menu') return toMenu();
+  showScreen(target);
+}
+function visibleScreen(){ return screens.find(s => !s.hidden); }
+function requireAccount(){ if (Auth.user) return true; showAuth('Please sign in to play.'); return false; }
+
+/* ---------- leaving a match in progress ---------- */
+const inMatch = () => app.dataset.mode === 'game' && ['level', 'round', 'result', 'paused', 'resuming'].includes(S.state);
+function askLeave(){
+  if (!inMatch()){ toMenu(); return; }
+  if (isOut(S.me)){ toMenu(); return; }                   // already out: nothing to lose
+  const ranked = S.players.filter(p => p.registered).length >= 2;
+  $('#confirmTitle').textContent = 'Leave this match?';
+  $('#confirmText').textContent = `You'll be counted as out${ranked ? ', and it counts as a loss for your rating' : ''}. The others keep playing.`;
+  $('#confirm').hidden = false;
+  setTimeout(() => $('#confirm .btn').focus({ preventScroll: true }), 50);
+}
+function hideConfirm(){ const c = $('#confirm'); if (c) c.hidden = true; }
+
 async function act(a, el){
   switch (a){
     case 'sound':
@@ -1389,52 +1430,65 @@ async function act(a, el){
       if (!Sfx.isMuted()) Sfx.click();
       if (el && app.dataset.mode === 'game') el.blur();
       return;
-    case 'gender': setGender(el.dataset.gender); return;
+    case 'back': goBack(); return;
     case 'quick': {
+      if (!requireAccount()) return;
       setErr('#menuErr', '');
-      if (el && el.closest && el.closest('#menu')) saveProfile();
       if (app.dataset.mode === 'game'){ G.gen++; sceneMe.reset(); sceneOpp.reset(); clearWord(); app.dataset.mode = 'menu'; }
       if (S.code) Net.send({ t: 'leave' });
       S.state = 'queue'; S.code = ''; S.players = [];
       renderQueue();
       showScreen('queue');
-      try { await Net.connect(); Net.send(Object.assign({ t: 'quick' }, profileMsg())); }
+      try { await Net.connect(); Net.send({ t: 'quick' }); }
       catch (e){ S.state = 'menu'; showScreen('menu'); setErr('#menuErr', connectError(e)); }
       return;
     }
     case 'cancelQuick': toMenu(); return;
     case 'create': {
+      if (!requireAccount()) return;
       setErr('#menuErr', '');
-      saveProfile();
-      try { await Net.connect(); Net.send(Object.assign({ t: 'create' }, profileMsg())); }
+      try { await Net.connect(); Net.send({ t: 'create' }); }
       catch (e){ setErr('#menuErr', connectError(e)); }
       return;
     }
     case 'joinScreen':
-      saveProfile(); setErr('#joinErr', ''); showScreen('join'); return;
+      if (!requireAccount()) return;
+      setErr('#joinErr', ''); openScreen('join', 'menu'); return;
     case 'join': {
+      if (!requireAccount()) return;
       setErr('#joinErr', '');
       const code = codeInput.value.trim();
       if (code.length !== 4){ setErr('#joinErr', 'The room code has 4 letters.'); return; }
-      try { await Net.connect(); Net.send(Object.assign({ t: 'join', code }, profileMsg())); }
+      try { await Net.connect(); Net.send({ t: 'join', code }); }
       catch (e){ setErr('#joinErr', connectError(e)); }
       return;
     }
     case 'start': Net.send({ t: 'start' }); return;
     case 'toLobby': S.state = 'lobbyWait'; Net.send({ t: 'toLobby' }); return;
+    case 'leaveAsk': if (el) el.blur(); askLeave(); return;
+    case 'cancelLeave': hideConfirm(); return;
+    case 'confirmLeave': hideConfirm(); toMenu(); return;
     case 'leaveMatch': toMenu(); return;
     case 'leave': toMenu(); return;
     case 'menu': toMenu(); return;
-    case 'howto': showScreen('howto'); return;
-    case 'solo': location.href = location.protocol === 'file:' ? 'solo/index.html' : 'solo/'; return;
-    case 'authScreen': setAuthTab('login'); setErr('#authErr', ''); showScreen('auth'); return;
+    case 'howto': openScreen('howto', Auth.user ? 'menu' : 'auth'); return;
+    case 'solo': if (!requireAccount()) return; location.href = 'solo/'; return;
     case 'authTab': setAuthTab(el.dataset.tab); return;
     case 'authSubmit': return submitAuth();
+    case 'togglePw': {
+      const inp = $('#authPass'), show = inp.type === 'password';
+      inp.type = show ? 'text' : 'password'; $('#authPass2').type = inp.type;
+      el.textContent = show ? 'HIDE' : 'SHOW'; el.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+      return;
+    }
     case 'logout':
       Auth.api('POST', '/logout').catch(() => {});
-      Auth.signOut();
+      Auth.signOut('You are signed out. See you soon!');
       return;
-    case 'board': showScreen('board'); loadBoard(S.boardTab || 'duel'); return;
+    case 'profile': openProfile(); return;
+    case 'av': setAvatarPart(el.dataset.k, el.dataset.v); return;
+    case 'changePw': return changePassword();
+    case 'board': if (!requireAccount()) return; openScreen('board', 'menu'); loadBoard(S.boardTab || 'duel'); return;
     case 'boardTab': loadBoard(el.dataset.tab); return;
   }
 }
@@ -1446,6 +1500,91 @@ app.addEventListener('click', e => {
   act(b.dataset.action, b);
 });
 
+/* ---------- profile: avatar editor, stats, password ---------- */
+let draftAvatar = null, avSaveTimer = 0;
+function swatch(k, v, color, label, on){
+  return `<button type="button" class="swatch${k === 'g' ? ' word' : ''}" data-action="av" data-k="${k}" data-v="${v}" aria-pressed="${on}" title="${label}" aria-label="${label}"${color ? ` style="--sw:${color}"` : ''}>${k === 'g' ? label.toUpperCase() : ''}</button>`;
+}
+function renderAvatarEditor(){
+  const a = draftAvatar;
+  $('#avPreview').innerHTML = AV.portrait(a, 'av-big');
+  $('#avG').innerHTML = ['man', 'woman'].map(g => swatch('g', g, '', g === 'man' ? 'Man' : 'Woman', a.g === g)).join('');
+  $('#avSkin').innerHTML = AV.SKIN.map((c, i) => swatch('skin', i, c[0], AV.NAMES.skin[i] + ' skin', a.skin === i)).join('');
+  $('#avHat').innerHTML = AV.HAT.map((c, i) => swatch('hat', i, c[0], AV.NAMES.hat[i] + ' hard hat', a.hat === i)).join('');
+  $('#avHair').innerHTML = AV.HAIR.map((c, i) => swatch('hair', i, c, AV.NAMES.hair[i] + ' hair', a.hair === i)).join('');
+}
+function setAvatarPart(k, v){
+  draftAvatar = AV.normalize(Object.assign({}, draftAvatar, { [k]: k === 'g' ? v : Number(v) }));
+  renderAvatarEditor();
+  sceneMe.setAvatar(draftAvatar);
+  $('#avStatus').textContent = 'Saving…';
+  clearTimeout(avSaveTimer);
+  avSaveTimer = setTimeout(async () => {
+    try {
+      const d = await Auth.api('POST', '/avatar', { avatar: draftAvatar });
+      Auth.user = d.user; renderAccount();
+      $('#avStatus').textContent = 'Saved!';
+    } catch (e){ $('#avStatus').textContent = e.message; }
+  }, 350);
+}
+async function openProfile(intro){
+  if (!requireAccount()) return;
+  draftAvatar = AV.normalize(Auth.user.avatar);
+  renderAvatarEditor();
+  $('#profileIntro').textContent = intro || "Pick your park worker's look. Changes save automatically.";
+  $('#avStatus').textContent = '';
+  ['#pwOld', '#pwNew', '#pwNew2'].forEach(id => { $(id).value = ''; });
+  setErr('#pwErr', ''); $('#pwOk').textContent = '';
+  openScreen('profile', 'menu');
+  const stats = $('#profileStats'), recent = $('#profileRecent');
+  stats.innerHTML = ''; recent.innerHTML = '<li class="empty">Loading…</li>';
+  const d = await Auth.refresh();
+  if (!d) return;
+  const u = d.user;
+  const cell = (label, value) => { const c = document.createElement('div'); c.innerHTML = '<b></b><span></span>'; c.querySelector('b').textContent = value; c.querySelector('span').textContent = label; stats.appendChild(c); };
+  cell('Rating', u.rating);
+  cell('Best rating', u.peakRating);
+  cell('Match rank', d.rank.duel ? '#' + d.rank.duel : 'none yet');
+  cell('Matches', u.matches);
+  cell('First places', u.wins);
+  cell('Solo best', u.soloBest ? `${u.soloBest} (level ${u.soloLevel})` : 'none yet');
+  recent.innerHTML = '';
+  if (!d.recent.length){ recent.innerHTML = '<li class="empty">No matches yet. Tap QUICK MATCH to play your first!</li>'; return; }
+  d.recent.forEach(m => {
+    const li = document.createElement('li');
+    const when = timeAgo(m.at);
+    const place = m.players > 2 ? `${ORD[m.place - 1]} of ${m.players}` : m.place === 1 ? 'Won' : 'Lost';
+    li.innerHTML = '<span class="r-place"></span><span class="r-info"></span><span class="r-delta"></span>';
+    li.querySelector('.r-place').textContent = place;
+    li.querySelector('.r-info').textContent = `${m.score} points, ${when}${m.reason === 'forfeit' ? ', someone left' : ''}`;
+    const dl = li.querySelector('.r-delta');
+    dl.textContent = m.ranked ? `${m.delta >= 0 ? '+' : ''}${m.delta}` : 'unranked';
+    dl.className = 'r-delta ' + (!m.ranked ? '' : m.delta >= 0 ? 'up' : 'down');
+    if (m.place === 1) li.classList.add('first');
+    recent.appendChild(li);
+  });
+}
+function timeAgo(t){
+  const s = Math.max(0, (Date.now() - t) / 1000);
+  if (s < 60) return 'just now';
+  if (s < 3600) return plural(Math.floor(s / 60), 'minute') + ' ago';
+  if (s < 86400) return plural(Math.floor(s / 3600), 'hour') + ' ago';
+  return plural(Math.floor(s / 86400), 'day') + ' ago';
+}
+async function changePassword(){
+  setErr('#pwErr', ''); $('#pwOk').textContent = '';
+  const cur = $('#pwOld').value, nw = $('#pwNew').value, nw2 = $('#pwNew2').value;
+  if (!cur || !nw){ setErr('#pwErr', 'Fill in your current and new password.'); return; }
+  if (nw !== nw2){ setErr('#pwErr', "The new passwords don't match."); return; }
+  const btn = $('#pwBtn'); btn.disabled = true;
+  try {
+    await Auth.api('POST', '/password', { current: cur, password: nw });
+    ['#pwOld', '#pwNew', '#pwNew2'].forEach(id => { $(id).value = ''; });
+    $('#pwOk').textContent = 'Password changed. Any other devices were signed out.';
+  } catch (e){ setErr('#pwErr', e.message); }
+  finally { btn.disabled = false; }
+}
+
 /* ---------- sign in / sign up ---------- */
 let authMode = 'login';
 function setAuthTab(mode){
@@ -1456,8 +1595,7 @@ function setAuthTab(mode){
   $('#authRules').hidden = !up;
   $('#authPass').setAttribute('autocomplete', up ? 'new-password' : 'current-password');
   $('#authSubmit').textContent = up ? 'CREATE ACCOUNT' : 'LOG IN';
-  $('#authIntro').textContent = up ? 'Pick a username. It will show on the leaderboard.' : 'Welcome back! Your rating and wins are waiting.';
-  if (up && !$('#authUser').value && S.profile.name) $('#authUser').value = S.profile.name.replace(/[^\p{L}\p{N}_]/gu, '').slice(0, 16);
+  $('#authIntro').textContent = up ? 'Create your account. Your username shows on the leaderboard.' : 'Welcome back! Sign in to play.';
   setErr('#authErr', '');
 }
 async function submitAuth(){
@@ -1468,11 +1606,13 @@ async function submitAuth(){
   if (authMode === 'signup' && password !== $('#authPass2').value){ setErr('#authErr', "The two passwords don't match."); return; }
   btn.disabled = true;
   try {
-    const d = await Auth.api('POST', authMode === 'signup' ? '/register' : '/login', { username, password, gender: S.profile.gender });
+    const signup = authMode === 'signup';
+    const d = await Auth.api('POST', signup ? '/register' : '/login', { username, password });
     Auth.signIn(d.token, d.user);
     $('#authPass').value = ''; $('#authPass2').value = '';
     Sfx.join();
-    showScreen('menu');
+    if (signup) openProfile(`Welcome, ${d.user.username}! Pick your park worker's look.`);
+    else toMenu();
   } catch (e){ setErr('#authErr', e.message); }
   finally { btn.disabled = false; }
 }
@@ -1501,7 +1641,7 @@ async function loadBoard(type){
   data.rows.forEach(r => {
     const li = document.createElement('li');
     if (r.username === myName) li.className = 'me';
-    li.innerHTML = `<span class="rk">${r.rank}</span><svg viewBox="-40 -178 72 60" aria-hidden="true"><use href="#portrait-${r.gender === 'woman' ? 'woman' : 'man'}"/></svg>
+    li.innerHTML = `<span class="rk">${r.rank}</span>${AV.portrait(r.avatar)}
       <span><span class="who"></span><span class="sub2"></span></span><span class="val"></span>`;
     li.querySelector('.who').textContent = r.username;
     if (S.boardTab === 'duel'){
@@ -1567,31 +1707,32 @@ if (matchMedia('(pointer: coarse)').matches) setTouch();
 addEventListener('touchstart', setTouch, { passive: true, once: true });
 
 /* =========================================================
-   Boot
+   Boot: everyone signs in first
    ========================================================= */
-setGender(S.profile.gender);
-sceneOpp.setGender(S.profile.gender === 'man' ? 'woman' : 'man');
 updateSoundUI();
-renderAccount();
+sceneMe.setAvatar(AV.DEFAULT);
+sceneOpp.setAvatar({ g: 'woman', hat: 2, hair: 1 });
 const wasInMatch = Session.inMatch;
-toMenu();
-if (location.protocol !== 'file:'){
-  fetch('/api/config').then(r => r.json()).then(async c => {
-    Auth.enabled = !!c.accounts;
-    renderAccount();
-    if (Auth.enabled) await Auth.refresh();
-    if (location.hash === '#leaderboard' && Auth.enabled && S.state === 'menu'){ showScreen('board'); loadBoard('duel'); history.replaceState(null, '', location.pathname); }
-  }).catch(() => {});
-}
+setAuthTab('login');
 if (location.protocol === 'file:'){
-  setErr('#menuErr', 'You opened the file directly, so only PLAY SOLO works here. For online play, run "node server.js" and open the address it prints.');
-} else if (wasInMatch){
-  // the page was reloaded during a match: try to take the seat back
-  S.state = 'reconnect';
-  showScreen('reconnect');
-  Net.connect().then(h => {
-    if (h.resumed) $('#reconnect').hidden = true;
-    else toMenu();
-  }).catch(() => toMenu());
+  $('#noticeText').textContent = 'You opened the file directly. Start the server with "node server.js" and open the address it prints. Everyone needs an account to play.';
+  $('#notice h2').textContent = 'Start the server first';
+  $('#notice .btn').hidden = true;
+  showScreen('notice');
+} else {
+  showScreen(null);
+  Auth.enabled = true;
+  (async () => {
+    const d = Auth.token ? await Auth.refresh() : null;
+    if (!d){ showAuth(); return; }
+    if (wasInMatch){
+      // the page was reloaded during a match: try to take the seat back
+      S.state = 'reconnect';
+      showScreen('reconnect');
+      try { const h = await Net.connect(); if (h.resumed){ $('#reconnect').hidden = true; return; } } catch (e){}
+    }
+    toMenu();
+    if (location.hash === '#leaderboard'){ openScreen('board', 'menu'); loadBoard('duel'); history.replaceState(null, '', location.pathname); }
+  })();
 }
 })();
