@@ -30,7 +30,7 @@ Finish it in time and your park worker cuts the branch before it lands on your c
 - **About 3,000 graded words** across 10 levels, plus phrases from level 7. No word repeats within a match, and you can add your own word list.
 - **Drops and reloads are handled.** A player who loses their connection has 15 seconds to come back; the match pauses and picks up where it left off.
 - **Works on phones** with a built-in on-screen keyboard and compact rival cards.
-- **Solo mode** with its own leaderboard.
+- **Solo mode** with its own leaderboard, also run on the server so solo scores can be trusted.
 - **Zero npm dependencies.** Plain JavaScript in the browser; Node.js with its built-in SQLite and a hand-written WebSocket server.
 
 ## Screenshots
@@ -148,12 +148,12 @@ flowchart LR
     S <--> DB[("SQLite<br/>accounts, matches, ratings")]
 ```
 
-- **The server is authoritative.** It picks the words, runs the clock, checks every keystroke and decides the order of finish. Editing the page in your browser can't change a result.
+- **The server is authoritative, in matches and in solo.** It picks the words, runs the clock, checks every keystroke, applies penalties, calculates scores and saves them. The browser only draws the game and sends keys, so editing the page, its settings or its clock can't change a result. In solo, pausing replaces the word with a new one and keeps only the share of time that was left, so a pause can't be used to read ahead or to dodge a running-out timer.
 - **Streaming instead of chatter.** Typing progress from all players is batched into one small snapshot, sent at most 10 times a second and only when something changed. In a 6-player test that averaged about 2 messages per second per player.
 - **Lag compensation.** A player on a slow connection sees the word late *and* their finish arrives late, so they lose one full round trip. The server measures each player's round trip every 2 seconds and credits it back, capped at 150 ms so faking lag can't pay off. Finishing order is decided after the round, from the compensated times.
 - **Reconnection.** Each browser tab has a session token. If the socket drops, the player gets the same seat back within 15 seconds; the match pauses and replays the interrupted round with a new word. A stale socket that the server hasn't noticed yet is retired immediately.
 - **Elo for groups.** Every ranked player is compared with every other one by finishing place, with the rating change shared out so a 6-player match moves ratings about as much as a duel.
-- **Shared rules.** `public/wordbank.js` and `public/avatar.js` are loaded by both the browser and the server, so solo mode, multiplayer and validation always agree.
+- **Shared code.** `public/avatar.js` is loaded by both the browser and the server, and `public/wordbank.js` holds the level and word rules the server applies to every mode.
 
 ## Project structure
 
@@ -168,7 +168,7 @@ public/
   wordbank.js          Level settings and word picking (shared with the server)
   avatar.js            Avatar palettes and rendering (shared with the server)
   words.js             About 3,000 graded words and 67 phrases
-  solo/                Single-player mode
+  solo/                Single-player mode (display only; the server runs the game)
 tools/build-words.py   Rebuilds the word list
 data/                  Database file (created on first run, not committed)
 ```
@@ -180,7 +180,7 @@ data/                  Database file (created on first run, not committed)
 - Only files inside `public/` are ever served; path tricks, hidden files and malformed requests are rejected without crashing the server.
 - All database queries are parameterised.
 - Over plain `http` on a local network, passwords travel unencrypted. Use HTTPS (a tunnel or a host provides it) when playing over the internet.
-- Solo scores are sent by the browser. The server rejects impossible scores, but solo mode can't be made fully cheat-proof. Multiplayer results are decided on the server.
+- Every score, solo or multiplayer, is calculated and saved by the server; there is no way for the browser to submit one. (Like any typing game, it can't stop someone from using an automated typing bot.)
 
 ## Built with
 

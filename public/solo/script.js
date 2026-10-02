@@ -4,29 +4,18 @@
 /* =========================================================
    CONFIG — tweak difficulty here
    ========================================================= */
+// Display settings only. In this version the SERVER picks the words, runs the clock, applies the
+// mistake penalty and calculates the score. Changing these values only changes animations on your own
+// screen; it can't give you more time or points.
 const CONFIG = {
-  wordsPerLevel: 3,          // correct words needed to clear a level
-  mistakePenalty: 0.5,       // seconds removed for each wrong key
-  baseCharCount: 4,          // words up to this length get the level's base time
-  extraTimePerChar: 0.15,    // bonus seconds per character beyond baseCharCount
-  scoring: { base: 100, perSecond: 20 },   // (base + secondsLeft * perSecond) * level
+  mistakePenalty: 0.5,       // shown instantly on a wrong key; the server's own clock then confirms it
   branch: { maxAngle: 30, shakeBase: 0.25, shakePerLevel: 0.14 },
-  words: {
-    1: ['CAT','RUN','HELP','SAVE','TREE','STOP','GO','FAST'],
-    2: ['DANGER','QUICK','BRANCH','RESCUE','FOREST','ESCAPE','ACTION','SAFETY'],
-    3: ['SAVE THE CAT','CUT THE BRANCH','WATCH OUT','MOVE QUICKLY','SAVE THE ANIMAL']
-  },
-  levels: [
-    { time: 8,   pools: [1],   note: 'Warm up those fingers.' },
-    { time: 7,   pools: [1],   note: 'The branch is creaking faster.' },
-    { time: 6,   pools: [1,2], note: 'Longer words are coming.' },
-    { time: 5.5, pools: [2],   note: 'Every word is a big one now.' },
-    { time: 5,   pools: [2],   note: 'The wind is picking up.' },
-    { time: 4.5, pools: [2],   note: 'Keep your eyes on the letters.' },
-    { time: 4,   pools: [2,3], note: 'Phrases join in. Spaces count.' },
-    { time: 3.5, pools: [2,3], note: 'The cat believes in you.' },
-    { time: 3,   pools: [3],   note: 'Full phrases only.' },
-    { time: 2.5, pools: [3],   note: 'Final level. Save the cat!' }
+  levels: [                  // shown before the first word arrives; the server sends each level's real note
+    { time: 8,   note: 'Warm up those fingers.' },   { time: 7,   note: 'The branches are creaking faster.' },
+    { time: 6,   note: 'Longer words are coming.' }, { time: 5.5, note: 'Every word is a bit bigger now.' },
+    { time: 5,   note: 'The wind is picking up.' },  { time: 4.5, note: 'Keep your eyes on the letters.' },
+    { time: 4,   note: 'Phrases join in.' },         { time: 3.5, note: 'Nerves of steel now.' },
+    { time: 3,   note: 'Long words and longer phrases.' }, { time: 2.5, note: 'Final level. Fastest fingers win!' }
   ]
 };
 
@@ -336,9 +325,9 @@ function pop(text, kind){
   (kind === 'penalty' ? timeWrap : challenge).appendChild(d);
   d.addEventListener('animationend', () => d.remove());
 }
-function showBanner(){
+function showBanner(note){
   bannerLv.textContent = 'Level ' + level;
-  bannerNote.textContent = CONFIG.levels[level-1].note;
+  bannerNote.textContent = note || CONFIG.levels[level-1].note;
   banner.classList.remove('show'); void banner.offsetWidth; banner.classList.add('show');
 }
 
@@ -349,27 +338,89 @@ let state = 'menu', level = 1, score = 0, wordsDone = 0;
 let target = '', typed = [], tiles = [], lastWord = null;
 let total = 8, elapsed = 0, lastT = 0, rafId = 0, warnMark = 4, jolt = 0, leafTimer = 1, branchGone = false;
 
-/* ---------- words: the shared word bank (about 3000 graded words) when available ---------- */
-const WB = window.STCWordBank || null;
-let BANK = WB && window.STC_WORDS ? WB.build(window.STC_WORDS, [], 'mix') : null;
-let picker = null;
-if (WB && BANK && location.protocol !== 'file:'){
-  // when served by server.js, also use the words from custom-words.txt
-  fetch('/api/words').then(r => r.json()).then(d => {
-    if (d && Array.isArray(d.custom) && d.custom.length) BANK = WB.build(window.STC_WORDS, d.custom, d.mode);
-  }).catch(() => {});
+/* ---------- the server runs the game: words, clock, mistakes and score all come from it ---------- */
+let roundId = 0, rtt = 0, pendingOver = null, overWaiter = null, readyPending = false;
+const sessionToken = () => {
+  try {
+    let t = sessionStorage.getItem('stc.session');
+    if (!t){ const a = new Uint8Array(16); crypto.getRandomValues(a); t = [...a].map(b => b.toString(16).padStart(2, '0')).join(''); sessionStorage.setItem('stc.session', t); }
+    return t;
+  } catch (e){ return null; }
+};
+const SoloNet = {
+  ws: null, pending: null,
+  connect(){
+    if (this.ws && this.ws.readyState === 1) return Promise.resolve();
+    if (this.pending) return this.pending;
+    this.pending = new Promise((resolve, reject) => {
+      let ws;
+      try { ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws'); }
+      catch (e){ this.pending = null; return reject(e); }
+      const timer = setTimeout(() => { try { ws.close(); } catch (e){} }, 6000);
+      ws.onopen = () => ws.send(JSON.stringify({ t: 'hello', token: sessionToken(), auth: authToken() }));
+      ws.onmessage = e => {
+        let m; try { m = JSON.parse(e.data); } catch (x){ return; }
+        if (m.t === 'sp'){ ws.send(JSON.stringify({ t: 'sp', s: m.s })); rtt = m.rtt || 0; return; }
+        if (m.t === 'hello' && ws !== this.ws){
+          clearTimeout(timer); this.ws = ws; this.pending = null;
+          try { if (m.token) sessionStorage.setItem('stc.session', m.token); } catch (x){}
+          resolve(); return;
+        }
+        onSolo(m);
+      };
+      ws.onclose = () => {
+        clearTimeout(timer);
+        const wasOpen = this.ws === ws;
+        if (wasOpen) this.ws = null;
+        if (this.pending && !wasOpen){ this.pending = null; reject(new Error('closed')); }
+        if (wasOpen) onSoloLost();
+      };
+    });
+    return this.pending;
+  },
+  send(o){ if (this.ws && this.ws.readyState === 1) this.ws.send(JSON.stringify(o)); }
+};
+function onSolo(m){
+  switch (m.t){
+    case 'soloLevel':
+      level = m.level; score = m.score; updateHUD();
+      levelIntro(m.note);
+      break;
+    case 'soloRound': onRound(m); break;
+    case 'soloMistake':
+      if (m.id === roundId && state === 'playing') elapsed = Math.max(elapsed, total - m.left);   // the server's clock wins
+      break;
+    case 'soloResult':
+      if (m.id !== roundId) break;
+      cancelAnimationFrame(rafId);
+      if (m.ok) success(m.points, m.score); else fail();
+      break;
+    case 'soloOver':
+      pendingOver = m;
+      if (overWaiter) overWaiter();
+      break;
+    case 'error':
+      if (m.code === 'auth'){ ACCOUNT = null; showScreen('gate'); }
+      break;
+  }
 }
-if (WB) WB.LEVELS.forEach((L, i) => { if (CONFIG.levels[i]) CONFIG.levels[i].note = L.note; });
-function pickWord(pools){
-  if (picker) return picker.next(level);              // never repeats a word within one game
-  const list = pools.flatMap(p => CONFIG.words[p]).filter(w => w !== lastWord);
-  const w = list[(Math.random()*list.length)|0];
-  lastWord = w;
-  return w;
+function overData(){
+  if (pendingOver) return Promise.resolve(pendingOver);
+  return new Promise(res => {
+    const done = () => { overWaiter = null; res(pendingOver); };
+    overWaiter = done; setTimeout(done, 4000);
+  });
 }
-function wordTime(L, word){
-  if (WB && BANK) return WB.durationFor(level, word);
-  return Math.round((L.time + Math.max(0, word.length - CONFIG.baseCharCount) * CONFIG.extraTimePerChar) * 10) / 10;
+function sendReady(){
+  if (holdGame){ readyPending = true; return; }       // the pause dialog is open: ask for the next word later
+  readyPending = false;
+  SoloNet.send({ t: 'soloReady' });
+}
+function onSoloLost(){
+  if (app.dataset.mode !== 'game' || state === 'over' || state === 'win') return;
+  gen++; state = 'menu';
+  toMenu();
+  $('#menuBest').textContent = 'The connection to the server dropped, so that game was not saved.';
 }
 
 function updateHUD(){
@@ -442,7 +493,11 @@ let holdGame = false;
 function pauseGame(){
   if (app.dataset.mode !== 'game' || state === 'over' || state === 'win') return false;
   holdGame = true;
-  if (state === 'playing'){ state = 'paused'; cancelAnimationFrame(rafId); }
+  if (state === 'playing'){
+    state = 'paused'; cancelAnimationFrame(rafId);
+    SoloNet.send({ t: 'soloPause' });               // the server freezes the clock and will swap the word
+    clearWord();
+  }
   $('#confirm').hidden = false;
   setTimeout(() => $('#confirm .btn').focus({ preventScroll: true }), 50);
   return true;
@@ -450,17 +505,18 @@ function pauseGame(){
 function resumeGame(){
   holdGame = false;
   $('#confirm').hidden = true;
-  if (state === 'paused'){ state = 'playing'; lastT = performance.now(); rafId = requestAnimationFrame(loop); }
+  if (state === 'paused'){ state = 'waiting'; SoloNet.send({ t: 'soloResume' }); }   // a new word with the time that was left
+  else if (readyPending) sendReady();
 }
 function toMenu(){
-  holdGame = false;
+  if (app.dataset.mode === 'game' && state !== 'over' && state !== 'win') SoloNet.send({ t: 'soloQuit' });
+  holdGame = false; readyPending = false; pendingOver = null;
   const c = $('#confirm'); if (c) c.hidden = true;
   if (!ACCOUNT){ showScreen('gate'); return; }
   resetScene();
   state = 'menu';
   app.dataset.mode = 'menu';
-  const best = store.get('stc.best', 0);
-  $('#menuBest').textContent = best > 0 ? 'Best score: ' + best : '';
+  $('#menuBest').textContent = '';
   showScreen('menu');
 }
 function startGame(){
@@ -468,29 +524,32 @@ function startGame(){
   try { window.focus(); } catch(e){}
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
   resetScene();
-  score = 0; level = 1; wordsDone = 0; lastWord = null;
-  picker = WB && BANK ? WB.createPicker(BANK) : null;
+  score = 0; level = 1; wordsDone = 0; pendingOver = null; readyPending = false; roundId = 0;
   updateHUD(); updateTime(CONFIG.levels[0].time, 0);
   timefill.style.transform = 'scaleX(1)';
   showScreen(null);
   app.dataset.mode = 'game';
-  levelIntro();
+  state = 'waiting';
+  SoloNet.connect().then(() => SoloNet.send({ t: 'soloStart' })).catch(() => {
+    toMenu(); $('#menuBest').textContent = 'Could not reach the game server. Check your connection and try again.';
+  });
 }
-async function levelIntro(){
+async function levelIntro(note){
   state = 'transition';
   updateHUD(); setIntensity(); clearWord();
   const L = CONFIG.levels[level-1];
   total = L.time; updateTime(L.time, 0); timefill.style.transform = 'scaleX(1)';
-  showBanner();
+  showBanner(note);
   Sfx.levelUp();
   if (!(await wait(1350))) return;
-  startRound();
+  sendReady();
 }
-function startRound(){
-  const L = CONFIG.levels[level-1];
-  target = pickWord(L.pools);
-  typed = []; elapsed = 0; jolt = 0;
-  total = wordTime(L, target);
+function onRound(m){
+  roundId = m.id; level = m.level;
+  target = m.word;
+  typed = []; jolt = 0;
+  total = m.duration;
+  elapsed = Math.min(0.3, rtt / 2000);                // line our clock up with the server's
   warnMark = total > 3.2 ? 4 : Math.ceil(total);
   leafTimer = 0.4;
   challenge.classList.remove('idle', 'done');
@@ -507,7 +566,7 @@ function startRound(){
   workerReact();
   state = 'playing';
   lastT = performance.now();
-  if (holdGame){ state = 'paused'; return; }     // the quit dialog is open: wait until the player decides
+  if (holdGame){ state = 'paused'; SoloNet.send({ t: 'soloPause' }); clearWord(); return; }   // dialog already open
   rafId = requestAnimationFrame(loop);
 }
 
@@ -536,7 +595,7 @@ function loop(now){
   leafTimer -= dt;
   if (leafTimer <= 0){ windLeaf(); leafTimer = Math.max(0.3, 2.2 - level * 0.19) * (0.7 + Math.random() * 0.6); }
 
-  if (left <= 0){ fail(); return; }
+  if (left <= 0){ state = 'waiting'; return; }        // the server calls time and sends the result
   rafId = requestAnimationFrame(loop);
 }
 
@@ -551,13 +610,15 @@ function handleChar(ch){
   const i = typed.length - 1;
   if (ch === target[i]) Sfx.type(); else mistake();
   renderTiles();
-  if (typed.join('') === target) success();
+  SoloNet.send({ t: 'soloProgress', id: roundId, typed: typed.join('') });
+  if (typed.join('') === target){ state = 'waiting'; cancelAnimationFrame(rafId); }   // the server confirms and scores it
 }
 function backspace(){
   if (state !== 'playing' || !typed.length) return;
   typed.pop();
   Sfx.type();
   renderTiles();
+  SoloNet.send({ t: 'soloProgress', id: roundId, typed: typed.join('') });
 }
 function mistake(){
   Sfx.wrong();
@@ -568,22 +629,20 @@ function mistake(){
 }
 
 /* ---------- outcomes ---------- */
-function addScore(pts){
-  const from = score; score += pts;
+function addScore(pts, newScore){
+  const from = score; score = newScore;
   const to = score;
   tween(650, t => { scoreEl.textContent = 'Score: ' + Math.round(lerp(from, to, t)); }, ease.out);
   scoreEl.classList.remove('bump'); void scoreEl.offsetWidth; scoreEl.classList.add('bump');
   pop('+' + pts, 'score');
 }
-async function success(){
+async function success(pts, newScore){
   state = 'resolving';
   cancelAnimationFrame(rafId);
   timeEl.classList.remove('danger');
-  const left = Math.max(0, total - elapsed);
-  const pts = Math.round((CONFIG.scoring.base + left * CONFIG.scoring.perSecond) * level);
   Sfx.correct();
   shout(Math.random() < .5 ? 'NICE!' : 'SAVED!', 'good');
-  addScore(pts);
+  addScore(pts, newScore);
   challenge.classList.add('done');
   setCat('lookup'); cat.shake = 0; applyCat();
   bubble.classList.remove('show');
@@ -613,15 +672,9 @@ async function success(){
   if (!(await wait(820))) return;
   if (!(await moveWorker(homeX, 420))) return;
 
-  wordsDone++;
-  if (wordsDone >= CONFIG.wordsPerLevel){
-    wordsDone = 0;
-    if (level >= CONFIG.levels.length){ win(); return; }
-    level++;
-    levelIntro();
-  } else {
-    startRound();
-  }
+  if (pendingOver && pendingOver.win){ win(); return; }   // that was the last word of level 10
+  state = 'between';
+  sendReady();                                              // the server sends the next word or the next level
 }
 async function fail(){
   state = 'resolving';
@@ -642,15 +695,12 @@ async function fail(){
   if (!(await wait(320))) return;
   leafOnHead();
   if (!(await wait(1000))) return;
+  const over = await overData();
   Sfx.gameOver();
   state = 'over';
-  const best = Math.max(store.get('stc.best', 0), score);
-  store.set('stc.best', best);
-  $('#goScore').textContent = score;
-  $('#goLevel').textContent = level;
-  $('#goBest').textContent = best;
+  showResult(over, '#goScore', '#goBest', '#goOnline');
+  $('#goLevel').textContent = over ? over.level : level;
   shoutEl.className = '';
-  saveOnline(score, level, '#goOnline');
   showScreen('gameover');
 }
 async function win(){
@@ -660,12 +710,8 @@ async function win(){
   setCat('happy'); hearts(5);
   tween(900, t => { cat.jump = -50 * Math.abs(Math.sin(Math.PI * 3 * t)); applyCat(); }, ease.lin);
   if (!(await wait(1500))) return;
-  const best = Math.max(store.get('stc.best', 0), score);
-  store.set('stc.best', best);
-  $('#winScore').textContent = score;
-  $('#winBest').textContent = best;
+  showResult(await overData(), '#winScore', '#winBest', '#winOnline');
   shoutEl.className = '';
-  saveOnline(score, CONFIG.levels.length, '#winOnline');
   showScreen('win');
 }
 
@@ -674,29 +720,19 @@ async function win(){
    ========================================================= */
 let accountsOn = false;
 const authToken = () => store.get('stc.auth', null);
-if (location.protocol !== 'file:'){
-  fetch('/api/config').then(r => r.json()).then(c => {
-    accountsOn = !!c.accounts;
-    const link = document.getElementById('soloBoardLink');
-    if (link) link.hidden = !accountsOn;
-  }).catch(() => {});
-}
-async function saveOnline(score, lvl, sel){
-  const el = $(sel);
-  el.className = 'online-line'; el.textContent = '';
-  if (!accountsOn) return;
-  if (!authToken()){ el.textContent = 'Sign in from the duel menu to put your scores on the leaderboard.'; return; }
-  if (score <= 0) return;
-  el.textContent = 'Saving your score…';
-  try {
-    const r = await fetch('/api/solo', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + authToken() },
-                                         body: JSON.stringify({ score, level: lvl }) });
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok){ el.textContent = d.error || 'Could not save your score.'; return; }
-    el.className = 'online-line' + (d.newBest ? ' good' : '');
-    el.textContent = d.newBest ? `New personal best! You're #${d.rank} on the solo leaderboard.`
-                               : `Saved. Your best is ${d.soloBest} (rank #${d.rank}).`;
-  } catch (e){ el.textContent = 'Could not reach the server to save your score.'; }
+// The server recorded the score itself; show what it saved.
+function showResult(over, scoreSel, bestSel, lineSel){
+  const el = $(lineSel);
+  const final = over ? over.score : score;
+  $(scoreSel).textContent = final;
+  const saved = over && over.saved;
+  const best = saved ? saved.soloBest : Math.max(final, (ACCOUNT && ACCOUNT.soloBest) || 0);
+  $(bestSel).textContent = best;
+  if (ACCOUNT) ACCOUNT.soloBest = best;
+  el.className = 'online-line' + (saved && saved.newBest ? ' good' : '');
+  el.textContent = !saved ? (final > 0 ? 'Your score could not be saved this time.' : '')
+    : saved.newBest ? `New personal best! You're #${saved.rank} on the solo leaderboard.`
+    : `Saved. Your best is ${saved.soloBest} (rank #${saved.rank}).`;
 }
 
 /* =========================================================

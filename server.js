@@ -117,16 +117,6 @@ function limited(key, max, windowMs){
 }
 setInterval(() => { const now = Date.now(); for (const [k, e] of limits) if (now > e.reset) limits.delete(k); }, 60000).unref();
 
-// The highest score a solo run can honestly reach by a given level (used to reject impossible scores)
-const SOLO_WORDS_PER_LEVEL = 3;
-function soloMaxScore(level){
-  let max = 0;
-  for (let L = 1; L <= level; L++){
-    max += SOLO_WORDS_PER_LEVEL * Math.ceil((GAME.scoring.base + WB.maxWordTime(L) * GAME.scoring.perSecond) * L);
-  }
-  return max;
-}
-
 async function handleApi(req, res, url){
   if (url.pathname === '/api/config') return json(res, 200, { accounts: !!DB });
   if (url.pathname === '/api/words') return json(res, 200, { mode: BANK.mode, custom: CUSTOM });
@@ -178,16 +168,9 @@ async function handleApi(req, res, url){
         const limit = Math.min(100, Math.max(1, Number(url.searchParams.get('limit')) || 50));
         return json(res, 200, { type, rows: DB.leaderboard(type, limit), totals: DB.stats() });
       }
-      case 'POST /api/solo': {
-        const user = DB.userBySession(bearer(req));
-        if (!user) return json(res, 401, { error: 'Sign in to save your score.' });
-        const b = await readJson(req);
-        const score = Math.floor(Number(b.score)), level = Math.floor(Number(b.level));
-        if (!Number.isFinite(score) || !Number.isFinite(level) || level < 1 || level > LEVEL_COUNT || score < 0 || score > soloMaxScore(level))
-          return json(res, 400, { error: 'That score could not be verified.' });
-        if (limited('solo:' + user.id, 1, 10000)) return json(res, 429, { error: 'Please wait a moment before saving another score.' });
-        return json(res, 200, DB.recordSolo(user.id, score, level));
-      }
+      case 'POST /api/solo':
+        // solo games now run on the server, which records the score itself
+        return json(res, 410, { error: 'Solo scores are recorded by the server during play.' });
     }
     return json(res, 404, { error: 'Not found.' });
   } catch (e){
@@ -653,6 +636,116 @@ function launchQuick(r){
   startMatch(r);
 }
 
+/* ---------- solo games: run here so the score can be trusted ---------- */
+const SOLO_WORDS_PER_LEVEL = 3;
+const SOLO_MISTAKE_PENALTY = 0.5;          // seconds taken off the clock for each wrong key
+const round1 = x => Math.round(x * 10) / 10;
+function soloDeadline(g){ return g.start + (g.duration - g.penalty) * 1000; }
+function soloArm(p){
+  const g = p.solo;
+  clearTimeout(g.timer);
+  // wait a little past the deadline so a finish that was sent in time can still arrive
+  const slack = GAME.roundGraceMs + Math.min(MAX_COMP_MS, p.rtt || 0);
+  g.timer = setTimeout(() => soloTimeout(p), Math.max(0, soloDeadline(g) - Date.now()) + slack);
+}
+function soloStart(p){
+  if (needAccount(p)) return;
+  leaveRoom(p);
+  soloQuit(p);
+  p.solo = { level: 1, inLevel: 0, score: 0, roundId: 0, state: 'intro', timer: null, announce: false,
+             picker: WB.createPicker(BANK, randomUnit) };
+  send(p, { t: 'soloLevel', level: 1, note: WB.LEVELS[0].note, score: 0 });
+}
+function soloReady(p){
+  const g = p.solo;
+  if (!g || (g.state !== 'intro' && g.state !== 'between')) return;
+  if (g.state === 'between' && g.announce){
+    g.announce = false; g.state = 'intro';
+    return send(p, { t: 'soloLevel', level: g.level, note: WB.LEVELS[g.level - 1].note, score: g.score });
+  }
+  soloRound(p, 1);
+}
+function soloRound(p, fraction){
+  const g = p.solo;
+  g.word = g.picker.next(g.level);
+  g.duration = Math.max(0.3, round1(WB.durationFor(g.level, g.word) * fraction));
+  g.penalty = 0; g.typed = ''; g.roundId++; g.state = 'round'; g.start = Date.now();
+  send(p, { t: 'soloRound', id: g.roundId, word: g.word, duration: g.duration, level: g.level, inLevel: g.inLevel + 1, score: g.score });
+  soloArm(p);
+}
+function soloProgress(p, msg){
+  const g = p.solo;
+  if (!g || g.state !== 'round' || msg.id !== g.roundId) return;
+  const typed = String(msg.typed || '').toUpperCase().replace(/[^A-Z ]/g, '').slice(0, g.word.length);
+  const grew = typed.length === g.typed.length + 1 && typed.startsWith(g.typed);
+  const shrank = typed.length === g.typed.length - 1 && g.typed.startsWith(typed);
+  if (!grew && !shrank) return;                 // one key at a time
+  g.typed = typed;
+  if (grew && typed[typed.length - 1] !== g.word[typed.length - 1]){
+    g.penalty += SOLO_MISTAKE_PENALTY;
+    const left = (soloDeadline(g) - Date.now()) / 1000;
+    send(p, { t: 'soloMistake', id: g.roundId, left: Math.max(0, Math.round(left * 100) / 100) });
+    if (left <= 0) return soloTimeout(p);
+    soloArm(p);
+  }
+  if (typed === g.word) soloFinish(p);
+}
+function soloFinish(p){
+  const g = p.solo;
+  clearTimeout(g.timer);
+  // same lag credit as in matches: a slow connection receives the word late and its finish arrives late
+  const finishedAt = Date.now() - Math.min(MAX_COMP_MS, p.rtt || 0);
+  const left = (soloDeadline(g) - finishedAt) / 1000;
+  if (left < 0) return soloTimeout(p);
+  const points = Math.round((GAME.scoring.base + left * GAME.scoring.perSecond) * g.level);
+  g.score += points; g.inLevel++;
+  g.state = 'between';
+  send(p, { t: 'soloResult', ok: true, id: g.roundId, points, score: g.score, left: Math.round(left * 100) / 100 });
+  if (g.inLevel >= SOLO_WORDS_PER_LEVEL){
+    g.inLevel = 0;
+    if (g.level >= LEVEL_COUNT) return soloOver(p, true);
+    g.level++; g.announce = true;
+  }
+}
+function soloTimeout(p){
+  const g = p.solo;
+  if (!g || g.state !== 'round') return;
+  clearTimeout(g.timer);
+  send(p, { t: 'soloResult', ok: false, id: g.roundId, score: g.score, word: g.word });
+  soloOver(p, false);
+}
+function soloOver(p, win){
+  const g = p.solo;
+  clearTimeout(g.timer);
+  let saved = null;
+  if (g.score > 0 && p.userId){
+    try { saved = DB.recordSolo(p.userId, g.score, g.level); } catch (e){ console.error('Could not save solo score:', e.message); }
+  }
+  send(p, { t: 'soloOver', win, score: g.score, level: g.level, saved });
+  p.solo = null;
+}
+// Pausing stops the clock, but the word is thrown away. On resume a NEW word comes with only the share of
+// time that was left, so a pause can't be used to read the word early or to escape a running-out timer.
+function soloPause(p){
+  const g = p.solo;
+  if (!g || g.state !== 'round') return;
+  clearTimeout(g.timer);
+  const left = (soloDeadline(g) - Date.now()) / 1000;
+  if (left <= 0) return soloTimeout(p);
+  g.fraction = left / g.duration;
+  g.state = 'paused';
+}
+function soloResume(p){
+  const g = p.solo;
+  if (!g || g.state !== 'paused') return;
+  soloRound(p, g.fraction);
+}
+function soloQuit(p){                          // quitting or disconnecting ends the game without saving it
+  if (!p.solo) return;
+  clearTimeout(p.solo.timer);
+  p.solo = null;
+}
+
 /* ---------- connections ---------- */
 function newPlayer(conn, token){
   const p = { token: token || crypto.randomBytes(16).toString('hex'), name: 'Player', gender: 'man', conn, room: null, graceTimer: null,
@@ -712,6 +805,7 @@ function onConnection(conn){
     const p = conn.player;
     if (!p || p.conn !== conn) return;
     p.conn = null;
+    soloQuit(p);
     if (p.room) goAway(p); else playersByToken.delete(p.token);
   };
   conn.onmessage = msg => {
@@ -750,6 +844,7 @@ function onConnection(conn){
       }
       case 'quick':
         if (needAccount(p)) return;
+        soloQuit(p);
         leaveRoom(p); setProfile(p);
         quickJoin(p);
         break;
@@ -774,6 +869,12 @@ function onConnection(conn){
       case 'leave':
         leaveRoom(p);
         break;
+      case 'soloStart': soloStart(p); break;
+      case 'soloReady': soloReady(p); break;
+      case 'soloProgress': soloProgress(p, msg); break;
+      case 'soloPause': soloPause(p); break;
+      case 'soloResume': soloResume(p); break;
+      case 'soloQuit': soloQuit(p); break;
     }
   };
 }
